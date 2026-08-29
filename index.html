@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VinVerifyTactics — Mobile VIN Verification, East Bay CA</title>
+<meta name="description" content="Mobile Form REG 31 VIN verification in Alameda, Contra Costa, San Mateo, and Santa Clara counties. We come to you.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <div class="brand"><span class="plate">CA</span> VinVerifyTactics</div>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#areas">Service area</a>
+      <a href="#book">Book</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Mobile Form REG 31 Verification</div>
+    <h1 class="stamped">We come to<br>the vehicle.</h1>
+    <p class="lede">Out-of-state title transfer, lapsed registration, or a vehicle that can't legally be driven to a DMV lane — we verify the VIN on site and sign the paperwork, anywhere in the East Bay.</p>
+    <div class="vin-sample">1HG&nbsp;CM8&nbsp;26 <span class="verified">✓ VERIFIED</span></div>
+    <div>
+      <a href="#book" class="btn btn-primary">Book a verification</a>
+      <a href="#how" class="btn btn-ghost" style="margin-left:12px;">How it works</a>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-label">Process</div>
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>Book online</h3>
+        <p>Tell us about the vehicle and where it's parked. We screen for eligibility before you're charged anything.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>We show up</h3>
+        <p>You'll get a confirmation, a day-before reminder, and an on-my-way text so there's no guessing.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>Form REG 31 signed</h3>
+        <p>VIN verified, paperwork signed on the spot — ready for the DMV counter or your registration service.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="areas">
+  <div class="wrap">
+    <div class="section-label">Coverage</div>
+    <h2>Service area</h2>
+    <div class="zones">
+      <div class="zone z1">
+        <span class="zone-tag">Zone 1 · No surcharge</span>
+        <h3>Alameda County</h3>
+        <p>Hayward, San Leandro, Fremont, Union City, Castro Valley, Newark, Alameda, Oakland.</p>
+      </div>
+      <div class="zone z2">
+        <span class="zone-tag">Zone 2 · Travel fee applies</span>
+        <h3>Contra Costa &amp; San Mateo</h3>
+        <p>Concord, Walnut Creek, Richmond, San Mateo, Redwood City — bridge tolls passed through at cost.</p>
+      </div>
+      <div class="zone z3">
+        <span class="zone-tag">Zone 3 · Appointment only</span>
+        <h3>San Francisco &amp; Santa Clara</h3>
+        <p>San Jose, Santa Clara, Sunnyvale, and San Francisco — scheduled as dedicated visits.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="book" class="booking">
+  <div class="wrap">
+    <div class="section-label">Booking</div>
+    <h2>Request a verification</h2>
+
+    <div class="callout" style="margin-bottom:28px; max-width:640px;">
+      <div class="mark">READ FIRST</div>
+      <div>
+        <p>California requires certain vehicles to be inspected directly by the CHP or DMV instead of a private verifier. Before booking, check whether any of the following apply — the form below will flag it automatically.</p>
+        <ul>
+          <li>Salvage, total loss, or junked title being revived</li>
+          <li>Custom-built or kit car</li>
+          <li>Missing or visibly damaged VIN plate</li>
+          <li>Motorcycle with no prior California DMV record</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="blocked-msg">
+      Based on your answer, California requires this vehicle to be inspected directly by the CHP or DMV rather than a private verifier — we're not able to sign Form REG 31 for this vehicle. <a href="https://www.chp.ca.gov/programs-services/services-information/vehicle-verification" target="_blank" rel="noopener">Find your nearest CHP vehicle verification office →</a>
+    </div>
+
+    <div id="form-success">
+      Request received. We'll text or email you shortly to confirm your appointment window.
+    </div>
+
+    <form id="booking-form" class="form-grid" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+      <div>
+        <label for="name">Full name</label>
+        <input type="text" id="name" name="name" required>
+      </div>
+      <div>
+        <label for="phone">Cell phone</label>
+        <input type="tel" id="phone" name="phone" required>
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+      </div>
+      <div>
+        <label for="date">Preferred day</label>
+        <input type="date" id="date" name="preferred_date" required>
+      </div>
+      <div class="full">
+        <label for="address">Vehicle location / service address</label>
+        <input type="text" id="address" name="address" required>
+      </div>
+      <div>
+        <label for="vehicle">Year / Make / Model</label>
+        <input type="text" id="vehicle" name="vehicle" placeholder="2014 Honda Civic" required>
+      </div>
+      <div>
+        <label for="reason">Reason for verification</label>
+        <select id="reason" name="reason" required>
+          <option value="">Select one</option>
+          <option>Out-of-state title transfer</option>
+          <option>Lapsed registration / record unavailable</option>
+          <option>Commercial fleet / trailer addition</option>
+          <option>Title correction</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="full">
+        <fieldset>
+          <legend>Eligibility check</legend>
+          <label class="check-row"><input type="checkbox" name="flag_salvage" class="eligibility-flag"> Salvage, total loss, or junked title being revived</label>
+          <label class="check-row"><input type="checkbox" name="flag_kit" class="eligibility-flag"> Custom-built or kit car</label>
+          <label class="check-row"><input type="checkbox" name="flag_vin" class="eligibility-flag"> Missing or visibly damaged VIN plate</label>
+          <label class="check-row"><input type="checkbox" name="flag_moto" class="eligibility-flag"> Motorcycle with no prior California DMV record</label>
+        </fieldset>
+      </div>
+
+      <div class="full">
+        <label for="notes">Anything else we should know?</label>
+        <textarea id="notes" name="notes" rows="3"></textarea>
+      </div>
+
+      <div class="full">
+        <button type="submit" class="btn btn-primary" id="submit-btn">Submit request</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>VinVerifyTactics — Mobile Vehicle Verification, East Bay CA</div>
+    <div>Questions? <a href="tel:+15555555555">(555) 555-5555</a> · <a href="mailto:hello@vinverifytactics.com">hello@vinverifytactics.com</a></div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

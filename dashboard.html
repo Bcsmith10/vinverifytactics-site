@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Dashboard — VinVerifyTactics (internal)</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="style.css">
+<style>
+  body{background:var(--bg);color:#F5F6F7;}
+  .dash-wrap{max-width:980px;margin:0 auto;padding:40px 24px 80px;}
+  .dash-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;}
+  .dash-header h1{font-family:var(--font-display);text-transform:uppercase;font-size:24px;margin:0;}
+  .gate{max-width:360px;margin:120px auto;text-align:center;}
+  .gate input{margin-bottom:14px;}
+  .job-form{background:var(--bg-raised);border:1px solid var(--line-dark);border-radius:var(--radius);padding:22px;margin-bottom:34px;}
+  .job-form .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+  .job-form .grid.full-row{grid-template-columns:1fr;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--steel-soft);
+    text-align:left;
+    padding:10px 12px;
+    border-bottom:1px solid var(--line-dark);
+  }
+  td{padding:12px;border-bottom:1px solid var(--line-dark);vertical-align:top;}
+  .status-pill{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    padding:4px 9px;
+    border-radius:12px;
+    display:inline-block;
+  }
+  .status-pending{background:#3A2E12;color:var(--tag);}
+  .status-confirmed{background:#12271C;color:#7FD8A0;}
+  .status-enroute{background:#12232A;color:#6FC3E0;}
+  .status-completed{background:#1E2530;color:#8B98A6;}
+  select.status-select{
+    background:#0D1218;border:1px solid var(--line-dark);color:#F5F6F7;
+    font-family:var(--font-mono);font-size:12px;padding:6px 8px;border-radius:3px;
+  }
+  .del-btn{
+    background:none;border:1px solid var(--line-dark);color:var(--steel-soft);
+    padding:5px 10px;border-radius:3px;font-size:12px;cursor:pointer;font-family:var(--font-body);
+  }
+  .del-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .empty-state{color:var(--steel-soft);font-size:14px;padding:30px 0;text-align:center;}
+  .note{font-size:12.5px;color:var(--steel-soft);margin-top:8px;}
+</style>
+</head>
+<body>
+
+<div id="gate-screen" class="dash-wrap gate">
+  <h1 style="margin-bottom:20px;">Dashboard access</h1>
+  <input type="password" id="gate-input" placeholder="Enter access code">
+  <button class="btn btn-primary" id="gate-submit" style="width:100%;justify-content:center;">Enter</button>
+  <p class="note">This is a basic deterrent, not real security — anyone with dev tools open can bypass it. Don't put anything here you wouldn't want a determined snoop to see.</p>
+</div>
+
+<div id="dashboard-screen" class="dash-wrap" style="display:none;">
+  <div class="dash-header">
+    <h1>Job Dashboard</h1>
+    <span class="brand" style="font-size:12px;">VinVerifyTactics · internal</span>
+  </div>
+
+  <div class="job-form">
+    <div class="grid">
+      <div>
+        <label for="j-name">Client name</label>
+        <input type="text" id="j-name">
+      </div>
+      <div>
+        <label for="j-phone">Phone</label>
+        <input type="text" id="j-phone">
+      </div>
+      <div>
+        <label for="j-vehicle">Vehicle</label>
+        <input type="text" id="j-vehicle" placeholder="2014 Honda Civic">
+      </div>
+    </div>
+    <div class="grid">
+      <div>
+        <label for="j-date">Date</label>
+        <input type="date" id="j-date">
+      </div>
+      <div>
+        <label for="j-zone">Zone</label>
+        <select id="j-zone">
+          <option value="Zone 1">Zone 1 — Alameda (no surcharge)</option>
+          <option value="Zone 2">Zone 2 — Contra Costa / San Mateo</option>
+          <option value="Zone 3">Zone 3 — SF / Santa Clara</option>
+        </select>
+      </div>
+      <div>
+        <label for="j-price">Price ($)</label>
+        <input type="text" id="j-price" placeholder="85">
+      </div>
+    </div>
+    <div class="grid full-row">
+      <div>
+        <label for="j-address">Service address</label>
+        <input type="text" id="j-address">
+      </div>
+    </div>
+    <button class="btn btn-primary" id="add-job-btn" type="button">Add job</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Vehicle</th>
+        <th>Date</th>
+        <th>Zone</th>
+        <th>Price</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="job-rows"></tbody>
+  </table>
+  <div id="empty-state" class="empty-state" style="display:none;">No jobs yet — add your first one above.</div>
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>
