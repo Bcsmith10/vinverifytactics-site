@@ -213,7 +213,6 @@ h2{
   border-radius:2px;
   margin-bottom:12px;
 }
-.zone.z3 .zone-tag{background:var(--accent);}
 .zone h3{font-family:var(--font-display);font-size:17px;text-transform:uppercase;margin:0 0 6px;}
 .zone p{margin:0;color:var(--steel);font-size:14px;}
 
