@@ -236,6 +236,22 @@ h2{
 .callout p:last-child{margin-bottom:0;}
 .callout ul{margin:8px 0;padding-left:18px;color:#5C3B1E;font-size:14.5px;}
 
+/* Payment note */
+.payment-note{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-family:var(--font-mono);
+  font-size:14px;
+  font-weight:600;
+  color:var(--tag);
+  background:rgba(242,183,5,0.1);
+  border:1px solid rgba(242,183,5,0.35);
+  border-radius:var(--radius);
+  padding:10px 16px;
+  margin:-16px 0 28px;
+}
+
 /* Form */
 .booking{background:var(--bg);color:#F5F6F7;}
 .booking h2{color:#F5F6F7;}

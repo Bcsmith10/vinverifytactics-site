@@ -5,7 +5,7 @@
 
 var STORAGE_KEY = 'vvt_jobs';
 var GATE_KEY = 'vvt_gate_ok';
-var ACCESS_CODE = 'vinverify2026'; // change this to whatever you like
+var ACCESS_CODE = 'VVT510Hayward!'; // change this to whatever you like
 
 function getJobs() {
   var raw = localStorage.getItem(STORAGE_KEY);
