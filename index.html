@@ -106,12 +106,16 @@
     <div class="callout" style="margin-bottom:28px; max-width:640px;">
       <div class="mark">READ FIRST</div>
       <div>
-        <p>California requires certain vehicles to be inspected directly by the CHP or DMV instead of a private verifier. Before booking, check whether any of the following apply — the form below will flag it automatically.</p>
+        <p>California requires certain vehicles to be inspected directly by the CHP or DMV instead of a private verifier. Before booking, check whether any of the following apply — the form below will flag it automatically. You'll also need the vehicle's title, registration card, or MSO/MCO on hand.</p>
         <ul>
-          <li>Salvage, total loss, or junked title being revived</li>
-          <li>Custom-built or kit car</li>
-          <li>Missing or visibly damaged VIN plate</li>
-          <li>Motorcycle with no prior California DMV record</li>
+          <li>Revived salvage or revived junk vehicle</li>
+          <li>Custom-built, kit-built, or replica vehicle</li>
+          <li>Incomplete or unassembled vehicle</li>
+          <li>VIN plate missing, damaged, illegible, or altered</li>
+          <li>Federal safety label (door-jamb sticker) missing, damaged, or altered</li>
+          <li>Ownership paperwork from a foreign country</li>
+          <li>Motorcycle with an engine change, or a used motorcycle last registered in California whose record no longer exists</li>
+          <li>1981 or newer vehicle with a VIN shorter than 17 characters</li>
         </ul>
       </div>
     </div>
@@ -164,9 +168,8 @@
         <select id="reason" name="reason" required>
           <option value="">Select one</option>
           <option>Out-of-state title transfer</option>
-          <option>Lapsed registration / record unavailable</option>
+          <option>Lapsed registration / California record unavailable</option>
           <option>Commercial fleet / trailer addition</option>
-          <option>Title correction</option>
           <option>Other</option>
         </select>
       </div>
@@ -174,11 +177,19 @@
       <div class="full">
         <fieldset>
           <legend>Eligibility check</legend>
-          <label class="check-row"><input type="checkbox" name="flag_salvage" class="eligibility-flag"> Salvage, total loss, or junked title being revived</label>
-          <label class="check-row"><input type="checkbox" name="flag_kit" class="eligibility-flag"> Custom-built or kit car</label>
-          <label class="check-row"><input type="checkbox" name="flag_vin" class="eligibility-flag"> Missing or visibly damaged VIN plate</label>
-          <label class="check-row"><input type="checkbox" name="flag_moto" class="eligibility-flag"> Motorcycle with no prior California DMV record</label>
+          <label class="check-row"><input type="checkbox" name="flag_salvage" class="eligibility-flag"> Revived salvage or revived junk vehicle</label>
+          <label class="check-row"><input type="checkbox" name="flag_kit" class="eligibility-flag"> Custom-built, kit-built, or replica vehicle</label>
+          <label class="check-row"><input type="checkbox" name="flag_incomplete" class="eligibility-flag"> Incomplete or unassembled vehicle</label>
+          <label class="check-row"><input type="checkbox" name="flag_vin" class="eligibility-flag"> VIN plate missing, damaged, illegible, or altered</label>
+          <label class="check-row"><input type="checkbox" name="flag_label" class="eligibility-flag"> Federal safety label (door-jamb sticker) missing, damaged, or altered</label>
+          <label class="check-row"><input type="checkbox" name="flag_foreign" class="eligibility-flag"> Ownership paperwork from a foreign country</label>
+          <label class="check-row"><input type="checkbox" name="flag_moto" class="eligibility-flag"> Motorcycle with an engine change, or a used motorcycle last registered in California whose record no longer exists</label>
+          <label class="check-row"><input type="checkbox" name="flag_shortvin" class="eligibility-flag"> 1981 or newer vehicle with a VIN shorter than 17 characters</label>
         </fieldset>
+      </div>
+
+      <div class="full">
+        <label class="check-row" style="text-transform:none;letter-spacing:0;font-family:var(--font-body);font-size:14px;color:#F5F6F7;"><input type="checkbox" name="has_documents" required> I have the title, registration card, or MSO/MCO for this vehicle</label>
       </div>
 
       <div class="full">
