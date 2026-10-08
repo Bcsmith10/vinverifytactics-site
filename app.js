@@ -1,13 +1,27 @@
-// VinVerifyTactics booking form — eligibility gate
-// Blocks submission if any eligibility flag is checked, and shows the
-// CHP/DMV referral message instead of letting the booking go through.
+// VinVerifyTactics booking form
+// 1) Eligibility gate: blocks submission if any eligibility flag is checked
+//    and shows the CHP/DMV referral message instead.
+// 2) Sends the form to Formspree in the background and shows the confirmation
+//    message on this page, rather than redirecting to a Formspree page.
+// 3) Prevents choosing a past date.
 
 document.addEventListener('DOMContentLoaded', function () {
   var form = document.getElementById('booking-form');
   var blockedMsg = document.getElementById('blocked-msg');
   var successMsg = document.getElementById('form-success');
+  var errorMsg = document.getElementById('form-error');
   var submitBtn = document.getElementById('submit-btn');
   var flags = document.querySelectorAll('.eligibility-flag');
+  var dateInput = document.getElementById('date');
+
+  // Earliest selectable day = today (local time)
+  if (dateInput) {
+    var now = new Date();
+    var yyyy = now.getFullYear();
+    var mm = String(now.getMonth() + 1).padStart(2, '0');
+    var dd = String(now.getDate()).padStart(2, '0');
+    dateInput.min = yyyy + '-' + mm + '-' + dd;
+  }
 
   function anyFlagChecked() {
     for (var i = 0; i < flags.length; i++) {
@@ -16,17 +30,19 @@ document.addEventListener('DOMContentLoaded', function () {
     return false;
   }
 
+  function setButtonEnabled(enabled) {
+    submitBtn.disabled = !enabled;
+    submitBtn.style.opacity = enabled ? '1' : '0.5';
+    submitBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  }
+
   function refreshEligibilityState() {
     if (anyFlagChecked()) {
       blockedMsg.style.display = 'block';
-      submitBtn.disabled = true;
-      submitBtn.style.opacity = '0.5';
-      submitBtn.style.cursor = 'not-allowed';
+      setButtonEnabled(false);
     } else {
       blockedMsg.style.display = 'none';
-      submitBtn.disabled = false;
-      submitBtn.style.opacity = '1';
-      submitBtn.style.cursor = 'pointer';
+      setButtonEnabled(true);
     }
   }
 
@@ -35,22 +51,38 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    errorMsg.style.display = 'none';
+
     // Hard stop: never let a flagged vehicle submit, even if the button
     // state was somehow bypassed.
     if (anyFlagChecked()) {
-      e.preventDefault();
       blockedMsg.style.display = 'block';
       blockedMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
-    // If a Formspree endpoint has been configured, let the form submit
-    // normally (native POST) but show a friendly inline confirmation too.
-    // If no endpoint is configured yet, prevent a broken submit and say so.
-    var action = form.getAttribute('action') || '';
-    if (action.indexOf('YOUR_FORM_ID') !== -1) {
-      e.preventDefault();
-      alert('Booking form isn\'t connected yet — set your Formspree endpoint in index.html (see README).');
-    }
+    var originalLabel = submitBtn.textContent;
+    submitBtn.textContent = 'Sending...';
+    setButtonEnabled(false);
+
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'Accept': 'application/json' }
+    }).then(function (response) {
+      if (response.ok) {
+        form.style.display = 'none';
+        successMsg.style.display = 'block';
+        successMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        throw new Error('Submit failed');
+      }
+    }).catch(function () {
+      errorMsg.style.display = 'block';
+      submitBtn.textContent = originalLabel;
+      setButtonEnabled(true);
+      errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   });
 });
