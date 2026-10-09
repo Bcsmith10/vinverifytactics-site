@@ -59,8 +59,20 @@ function renderJobs() {
   });
 
   tbody.querySelectorAll('.del-btn').forEach(function (btn) {
+    var timer = null;
     btn.addEventListener('click', function () {
-      removeJob(btn.getAttribute('data-id'));
+      // Two-step remove without a browser popup: first click arms, second click deletes.
+      if (btn.getAttribute('data-armed') === 'true') {
+        clearTimeout(timer);
+        removeJob(btn.getAttribute('data-id'));
+        return;
+      }
+      btn.setAttribute('data-armed', 'true');
+      btn.textContent = 'Click again to confirm';
+      timer = setTimeout(function () {
+        btn.removeAttribute('data-armed');
+        btn.textContent = 'Remove';
+      }, 4000);
     });
   });
 }
@@ -109,7 +121,6 @@ function updateJobStatus(id, status) {
 }
 
 function removeJob(id) {
-  if (!confirm('Remove this job? This cannot be undone.')) return;
   var jobs = getJobs().filter(function (j) { return j.id !== id; });
   saveJobs(jobs);
   renderJobs();
