@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>REG 31 Assistant</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">REG 31 Assistant <small>private · data stays on this phone</small></div>
+    <div class="top-btns">
+      <button type="button" id="btnLog" class="ghost">Job log</button>
+      <button type="button" id="btnSettings" class="ghost">Settings</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- Settings -->
+<section id="settingsCard" class="card hidden">
+  <h2>Your verifier info <span class="tag">saved on this phone only</span></h2>
+  <p class="note">This prints in the verifier block on every form. Address is the one to confirm with the DMV before you rely on it.</p>
+  <div class="grid">
+    <label>Verifier name (print)<input id="st_name" autocomplete="off"></label>
+    <label>VV license number<input id="st_lic" autocomplete="off" placeholder="V00332"></label>
+    <label class="full">Address<input id="st_addr" autocomplete="off"></label>
+    <label>City<input id="st_city" autocomplete="off"></label>
+    <label>State<input id="st_state" value="CA" maxlength="2" autocomplete="off"></label>
+    <label>Daytime phone<input id="st_phone" inputmode="tel" autocomplete="off" placeholder="10 digits"></label>
+    <label>Email<input id="st_email" type="email" autocomplete="off"></label>
+  </div>
+  <button type="button" id="saveSettings" class="primary">Save</button>
+</section>
+
+<!-- Job log -->
+<section id="logCard" class="card hidden">
+  <h2>Job log <span class="tag">this phone only</span></h2>
+  <div id="logList" class="loglist"></div>
+  <div class="row">
+    <button type="button" id="logCsv" class="ghost">Download CSV</button>
+    <button type="button" id="logClear" class="ghost danger">Clear log</button>
+  </div>
+</section>
+
+<!-- Pre-check -->
+<section class="card" id="gateCard">
+  <h2>0 · Pre-check <span class="tag">any YES = refer to CHP/DMV</span></h2>
+  <p class="note">From the REG 31 notes (Rev. 5/2025). Check any that apply to this vehicle.</p>
+  <label class="chk"><input type="checkbox" class="gate"> Federal safety label disagrees with the VIN, or is illegible, damaged, altered, missing, never issued (e.g. grey-market import), or doesn't match the documents</label>
+  <label class="chk"><input type="checkbox" class="gate"> Revived salvage or revived junk vehicle</label>
+  <label class="chk"><input type="checkbox" class="gate"> Specially constructed (SPCNS), kit, replica, custom-built or incomplete vehicle</label>
+  <label class="chk"><input type="checkbox" class="gate"> Used motorcycle with an unavailable California record, or a motorcycle with an engine change</label>
+  <label class="chk"><input type="checkbox" class="gate"> Ownership documents from a foreign country</label>
+  <label class="chk"><input type="checkbox" class="gate"> VIN plate missing, damaged, illegible or altered (or the VIN doesn't "appear okay")</label>
+  <label class="chk"><input type="checkbox" class="gate"> No supporting ownership document (title, MCO/MSO, SF 97-1 or registration card)</label>
+  <label class="chk"><input type="checkbox" class="gate"> 1981 or newer vehicle with a VIN shorter than 17 characters</label>
+  <label class="chk"><input type="checkbox" class="gate"> Vehicle already has a California record and is not a nonresident vehicle</label>
+  <div id="gateMsg" class="stop hidden"></div>
+</section>
+
+<!-- Vehicle -->
+<section class="card">
+  <h2>Vehicle <span class="tag">header of the form</span></h2>
+
+  <div class="photoRow" data-photo="vin" data-ocr="vin">
+    <button type="button" class="cam">📷 Photo of VIN</button><span class="ocrstat"></span><img class="thumb hidden" alt="">
+  </div>
+  <label class="full">VIN<input id="vin" class="mono big" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="17" placeholder="17 characters"></label>
+  <div id="vinChips" class="chips"></div>
+  <div id="vinStatus" class="status"></div>
+
+  <div class="grid">
+    <label>Category
+      <select id="cat">
+        <option value="">Select…</option>
+        <option value="auto">Automobile</option>
+        <option value="comm">Commercial</option>
+        <option value="pti">Permanent Trailer ID (PTI)</option>
+        <option value="cch">Trailer Coach (CCH)</option>
+        <option value="moto">Motorcycle (Street)</option>
+        <option value="ohv">Off-Highway (OHV)</option>
+      </select>
+    </label>
+    <label>Model year <select id="year"><option value="">Enter VIN first</option></select></label>
+    <label>Make<input id="make" autocomplete="off"></label>
+    <label>Model or series<input id="model" autocomplete="off"></label>
+    <label>Body type model (BTM)<input id="btm" list="btmList" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="e.g. 4D"></label>
+    <label>No. of wheels<input id="wheels" inputmode="numeric" value="4"></label>
+    <label>Motive power (fuel)
+      <select id="motive">
+        <option value="">Select…</option>
+        <option value="G">G – Gasoline</option><option value="D">D – Diesel</option><option value="E">E – Electric</option>
+        <option value="Q">Q – Hybrid</option><option value="F">F – Flex Fuel</option><option value="N">N – Natural Gas</option>
+        <option value="P">P – Propane</option><option value="B">B – Butane</option><option value="M">M – Methanol</option>
+        <option value="R">R – Hydrogen</option><option value="NA">N/A</option>
+      </select>
+    </label>
+    <label>GVWR (pickups only, lbs)<input id="gvwr" inputmode="numeric" placeholder="N/A"></label>
+  </div>
+  <datalist id="btmList">
+    <option value="2D">Sedan 2 DR</option><option value="4D">Sedan 4 DR</option><option value="5D">Sedan 5 DR</option><option value="SD">Sedan</option>
+    <option value="CP">Coupe</option><option value="3P">Coupe 3 DR</option><option value="C4">Coupe 4 DR</option><option value="CV">Convertible</option>
+    <option value="HT">Hardtop</option><option value="2T">Hardtop 2 DR</option><option value="4T">Hardtop 4 DR</option>
+    <option value="HB">Hatchback</option><option value="2H">Hatchback 2 DR</option><option value="4H">Hatchback 4 DR</option>
+    <option value="2L">Liftback 2 DR</option><option value="4L">Liftback 4 DR</option><option value="SW">Station Wagon</option>
+    <option value="4W">Wagon/Sport Utility 4 DR</option><option value="UT">Utility</option><option value="RD">Roadster</option>
+    <option value="PK">Pickup</option><option value="PC">Pickup Club Cab</option><option value="3C">3 DR Ext. Cab Pickup</option>
+    <option value="4C">4 DR Ext. Cab Pickup</option><option value="SP">Sports Pickup</option><option value="VN">Van</option>
+    <option value="PN">Panel</option><option value="CB">Cab and Chassis</option><option value="SN">Step Van</option>
+    <option value="RS">Motorcycle Road/Street</option><option value="RT">Motorcycle Road/Trail</option><option value="MC">All other motorcycles</option>
+    <option value="VA">Varied – must be described</option>
+  </datalist>
+  <p class="note">BTM codes are on page 2 of the REG 31. The list above is a shortcut; confirm the code there if you are unsure.</p>
+
+  <div id="motoBox" class="hidden">
+    <label class="full">Engine number (motorcycles and OHVs)<input id="engno" class="mono" autocapitalize="characters" autocomplete="off" maxlength="17"></label>
+  </div>
+  <div id="ohvBox" class="hidden">
+    <label>OHV type
+      <select id="ohv_type"><option value="">Select…</option><option value="comp">Complying</option><option value="noncomp">Non-complying</option></select>
+    </label>
+  </div>
+  <div id="trailerBox" class="hidden grid">
+    <label>Est. weight (PTI trailers, lbs)<input id="estwt" inputmode="numeric" placeholder="N/A"></label>
+    <label>Camp/coach length<input id="camplen" placeholder="N/A"></label>
+    <label>Camp/coach width<input id="campwid" placeholder="N/A"></label>
+    <label>Axles<input id="axles" inputmode="numeric" placeholder="N/A"></label>
+  </div>
+
+  <h3>License plates on vehicle</h3>
+  <div class="grid">
+    <label>Plates
+      <select id="plate_type"><option value="none">None</option><option value="plate">Plate number</option><option value="dealer">Dealer</option><option value="temp">Temporary permit</option></select>
+    </label>
+    <label>Plate number<input id="plate_no" autocapitalize="characters" autocomplete="off"></label>
+    <label>State<input id="plate_state" maxlength="2" autocapitalize="characters" autocomplete="off"></label>
+    <label>Expiration (MM/YYYY)<input id="plate_exp" inputmode="numeric" autocomplete="off"></label>
+  </div>
+</section>
+
+<!-- Sections 1-3 -->
+<section class="card">
+  <h2>1–3 · The VIN on the vehicle</h2>
+  <div class="grid">
+    <label>1) VIN location
+      <select id="s1">
+        <option value="">Select…</option>
+        <option value="windshield">Visible through windshield</option>
+        <option value="bodyL">Body—Left (driver side)</option>
+        <option value="bodyR">Body—Right</option>
+        <option value="engine">Engine compartment</option>
+        <option value="door">Door Frame/Door Post</option>
+        <option value="steering">Steering Column</option>
+        <option value="firewall">Firewall</option>
+        <option value="other">Other (write in)</option>
+      </select>
+    </label>
+    <label>…other<input id="s1_other" autocomplete="off"></label>
+    <label>2) Attached by
+      <select id="s2">
+        <option value="">Select…</option>
+        <option value="notvisible">Not visible</option>
+        <option value="rosette">Rosette rivets</option>
+        <option value="round">Round rivets</option>
+        <option value="adhesive">Adhesive</option>
+        <option value="na">Not applicable</option>
+        <option value="screws">Screws</option>
+        <option value="stamped">Stamped</option>
+        <option value="other">Other (write in)</option>
+      </select>
+    </label>
+    <label>…other<input id="s2_other" autocomplete="off"></label>
+    <label>3) Type
+      <select id="s3">
+        <option value="">Select…</option>
+        <option value="plate">Metal plate</option>
+        <option value="label">Label</option>
+        <option value="body">Stamped on body</option>
+        <option value="frame">Stamped on frame</option>
+        <option value="other">Other (write in)</option>
+      </select>
+    </label>
+    <label>…other<input id="s3_other" autocomplete="off"></label>
+  </div>
+</section>
+
+<!-- Section 4-5 -->
+<section class="card">
+  <h2>4–5 · Condition and model year</h2>
+  <div class="grid">
+    <label>4) VIN condition
+      <select id="s4_vin">
+        <option value="">Select…</option>
+        <option value="ok">Appears okay</option>
+        <option value="illegible">Illegible/Damaged*</option>
+        <option value="cannot">Cannot locate*</option>
+        <option value="altered">Altered/Tampered*</option>
+        <option value="missing">Missing*</option>
+        <option value="none">None – Newly built*</option>
+        <option value="fo">Assigned by F/O</option>
+        <option value="remarks">See REMARKS</option>
+      </select>
+    </label>
+    <label id="s4engWrap" class="hidden">4) Engine number condition
+      <select id="s4_eng">
+        <option value="">Select…</option>
+        <option value="ok">Appears okay</option>
+        <option value="illegible">Illegible/Damaged*</option>
+        <option value="cannot">Cannot locate*</option>
+        <option value="altered">Altered/Tampered*</option>
+        <option value="missing">Missing*</option>
+        <option value="none">None – Newly built*</option>
+        <option value="fo">Assigned by F/O</option>
+        <option value="remarks">See REMARKS</option>
+      </select>
+    </label>
+    <label>5) Model year determined from
+      <select id="s5">
+        <option value="digit10">10th digit of VIN (1980 &amp; newer)</option>
+        <option value="natb">NATB/NICB book/manual</option>
+        <option value="other">Other – see REMARKS</option>
+      </select>
+    </label>
+    <label>…page #<input id="s5_page" autocomplete="off"></label>
+  </div>
+  <p class="note">* = the form says refer to CHP.</p>
+</section>
+
+<!-- Section 6 -->
+<section class="card">
+  <h2>6 · Federal certification label (door jamb)</h2>
+  <div class="photoRow" data-photo="label">
+    <button type="button" class="cam">📷 Photo of label</button><img class="thumb hidden" alt="">
+  </div>
+  <div class="grid">
+    <label>Label status
+      <select id="s6_status">
+        <option value="">Select…</option>
+        <option value="agrees">Agrees with VIN</option>
+        <option value="disagrees">Disagrees with VIN*</option>
+        <option value="illegible">Illegible/Damaged*</option>
+        <option value="altered">Altered/Tampered*</option>
+        <option value="missing">Missing/None*</option>
+        <option value="pre1970">Pre-1970</option>
+        <option value="remarks">See REMARKS</option>
+      </select>
+    </label>
+    <label>Label indicates
+      <select id="s6_ind">
+        <option value="">Select…</option>
+        <option value="fmvss">Complies with US FMVSS</option>
+        <option value="importer">Name of vehicle importer (put name in Remarks)</option>
+        <option value="other">Complies with safety requirements of another country</option>
+        <option value="lsv">Compliance with Low-Speed Vehicle (LSV) requirements</option>
+        <option value="na">Not required (pre-1970 / OHV)</option>
+      </select>
+    </label>
+  </div>
+</section>
+
+<!-- Section 7 -->
+<section class="card">
+  <h2>7 · Odometer</h2>
+  <div class="photoRow" data-photo="odo" data-ocr="odo">
+    <button type="button" class="cam">📷 Photo of odometer</button><span class="ocrstat"></span><img class="thumb hidden" alt="">
+  </div>
+  <div class="grid">
+    <label>Mileage exactly as shown<input id="odo" class="mono big" inputmode="numeric" maxlength="6" autocomplete="off"></label>
+    <label>Units
+      <select id="odo_unit"><option value="miles">miles</option><option value="km">kilometers</option></select>
+    </label>
+    <label>Odometer type
+      <select id="odo_digits"><option value="6">6-digit</option><option value="5">5-digit</option><option value="digital">digital display</option></select>
+    </label>
+    <label class="chk inline"><input type="checkbox" id="odo_none"> No odometer (NONE)</label>
+  </div>
+  <div id="odoChips" class="chips"></div>
+</section>
+
+<!-- Section 8 -->
+<section class="card">
+  <h2>8 · Ownership document</h2>
+  <div class="photoRow" data-photo="doc" data-ocr="docvin">
+    <button type="button" class="cam">📷 Photo of title / registration</button><span class="ocrstat"></span><img class="thumb hidden" alt="">
+  </div>
+  <div class="grid">
+    <label>Document type
+      <select id="s8_type">
+        <option value="">Select…</option>
+        <option value="title">Certificate of Title</option>
+        <option value="msomco">MSO/MCO</option>
+        <option value="sf97">US Government SF 97-1</option>
+        <option value="reg">Registration Card</option>
+        <option value="salvage">Salvage Certificate</option>
+        <option value="none">NONE</option>
+      </select>
+    </label>
+    <label>VIN on the document<input id="docvin" class="mono" autocapitalize="characters" autocomplete="off" maxlength="17"></label>
+    <label>Condition
+      <select id="s8_cond">
+        <option value="">Select…</option>
+        <option value="agrees">Agrees with VIN</option>
+        <option value="disagrees">Disagrees with VIN</option>
+        <option value="remarks">See REMARKS</option>
+      </select>
+    </label>
+  </div>
+  <div id="docStatus" class="status"></div>
+</section>
+
+<!-- Section 9 -->
+<section class="card">
+  <h2>9 · Emission label (under the hood)</h2>
+  <div class="photoRow" data-photo="emis" data-ocr="emis">
+    <button type="button" class="cam">📷 Photo of emission label</button><span class="ocrstat"></span><img class="thumb hidden" alt="">
+  </div>
+  <div class="grid">
+    <label>Label indicates
+      <select id="s9">
+        <option value="">Select…</option>
+        <option value="epa">Meets US EPA standards only</option>
+        <option value="both">Meets US EPA standards and California standards</option>
+        <option value="ca">Meets California standards only</option>
+        <option value="exempt">Exempt (Former Military Vehicle – OHV use only)</option>
+        <option value="caohv">California standards for Off Highway Vehicles (OHV)</option>
+        <option value="dual">California standards for on-road and OHV (Dual Sport M/C)</option>
+        <option value="u50">Engine displacement less than 50 cc</option>
+        <option value="sore">SORE Label (OHV-TCS Referral)</option>
+        <option value="remarks">See REMARKS</option>
+        <option value="none">None</option>
+      </select>
+    </label>
+    <label>Test group / engine family number<input id="s9_family" class="mono" autocapitalize="characters" autocomplete="off"></label>
+  </div>
+  <div id="emisHint" class="status"></div>
+  <div id="emisChips" class="chips"></div>
+  <label class="full hidden" id="btmvaWrap">BTM varied (VA): describe vehicle<input id="btmva" autocomplete="off" placeholder="e.g. PK over 11,499 GVWR"></label>
+</section>
+
+<!-- Remarks / location -->
+<section class="card">
+  <h2>Remarks and where you verified</h2>
+  <label class="full">Remarks (leave empty for N/A)<textarea id="remarks" rows="3" maxlength="200"></textarea></label>
+  <label class="chk"><input type="checkbox" id="f_door"> Door replaced</label>
+  <label class="chk"><input type="checkbox" id="f_air"> Air bag missing</label>
+  <h3>Physically verified at</h3>
+  <div class="grid">
+    <label>Where
+      <select id="loc_mode"><option value="other">Other (customer location)</option><option value="above">Above address (my address)</option></select>
+    </label>
+    <label class="full">Street address<input id="loc_street" autocomplete="off"></label>
+    <label>City<input id="loc_city" autocomplete="off"></label>
+    <label>State<input id="loc_state" value="CA" maxlength="2" autocomplete="off"></label>
+    <label>Executed at (city, state)<input id="exec_at" autocomplete="off" placeholder="same as above"></label>
+    <label>Date signed<input id="exec_date" autocomplete="off"></label>
+  </div>
+</section>
+
+<section class="card" id="resultCard">
+  <h2>Create the form</h2>
+  <div id="stopBox" class="stop hidden"></div>
+  <div id="missBox" class="miss hidden"></div>
+  <div id="warnBox" class="warn hidden"></div>
+  <button type="button" id="make_pdf" class="primary big">Create REG 31 PDF</button>
+  <button type="button" id="make_dnp" class="ghost danger hidden">Create anyway, marked DO NOT PROCESS – REFER TO CHP</button>
+  <div id="pdfOut" class="hidden">
+    <p class="ok">Your form is ready. Read every box against the vehicle, then print it and sign by hand. Typed or stamped signatures are not accepted.</p>
+    <a id="pdfLink" class="primary linkbtn" target="_blank" rel="noopener">Open PDF</a>
+    <a id="pdfDl" class="ghost linkbtn">Download</a>
+  </div>
+  <button type="button" id="newJob" class="ghost">Start a new vehicle</button>
+</section>
+
+</main>
+
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
