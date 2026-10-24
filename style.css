@@ -335,3 +335,10 @@ footer a{color:var(--tag);text-decoration:none;}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto;}
 }
+
+/* Logo in header and hero */
+.brand-logo{display:inline-flex;align-items:center;line-height:0;}
+.brand-logo img{height:46px;width:auto;display:block;}
+.hero .wrap{position:relative;}
+.hero-mark{position:absolute;right:24px;top:50%;transform:translateY(-50%);width:320px;height:auto;opacity:.95;}
+@media (max-width: 900px){.hero-mark{display:none;}}
