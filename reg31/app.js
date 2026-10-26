@@ -754,6 +754,9 @@ function init() {
     if (el.closest('#settingsCard')) return;
     el.addEventListener('input', refresh); el.addEventListener('change', refresh);
   });
+  { const sel = $('btmSel'); document.querySelectorAll('#btmList option').forEach((o) => { const e = document.createElement('option'); e.value = o.value; e.textContent = o.value + ' – ' + o.textContent; sel.appendChild(e); });
+    sel.addEventListener('change', () => { if (sel.value) { $('btm').value = sel.value; $('btm').dispatchEvent(new Event('input', { bubbles: true })); } });
+    $('btm').addEventListener('input', () => { const v = $('btm').value.toUpperCase(); sel.value = Array.from(sel.options).some((o) => o.value === v) ? v : ''; }); sel.value = Array.from(sel.options).some((o) => o.value === $('btm').value.toUpperCase()) ? $('btm').value.toUpperCase() : ''; }
   $('s8_cond').addEventListener('change', () => { $('s8_cond').dataset.touched = '1'; });
   $('vin').addEventListener('input', () => { $('vinChips').innerHTML = ''; });
   document.querySelectorAll('.photoRow').forEach((row) => {
