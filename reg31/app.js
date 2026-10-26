@@ -38,8 +38,8 @@ function yearsFromVin(v) {
 const IDS = ['vin','cat','year','make','model','btm','wheels','motive','gvwr','engno','ohv_type','estwt','camplen','campwid','axles',
   'plate_type','plate_no','plate_state','plate_exp','s1','s1_other','s2','s2_other','s3','s3_other','s4_vin','s4_eng','s5','s5_page',
   's6_status','s6_ind','odo','odo_unit','odo_digits','docvin','s8_type','s8_cond','s9','s9_family','btmva','remarks',
-  'loc_mode','loc_street','loc_city','loc_state','exec_at','exec_date'];
-const CHECKS = ['odo_none','f_door','f_air'];
+  'loc_mode','loc_street','loc_city','loc_state','exec_at','exec_date','req_name','req_addr','fee','lastreg'];
+const CHECKS = ['odo_none','f_door','f_air','cf_vin','cf_odo'];
 
 function collect() {
   const S = {};
@@ -119,6 +119,10 @@ function evaluate(S) {
 
   if (S.loc_mode === 'other' && (!S.loc_street || !S.loc_city || !S.loc_state)) miss.push('Where you verified (street, city, state)');
   if (!S.exec_date) miss.push('Date signed');
+  { const jm = []; if (!S.req_name) jm.push('requester name'); if (!S.req_addr) jm.push('requester address'); if (!S.fee) jm.push('fee'); if (!S.lastreg) jm.push('state last registered');
+    if (jm.length) miss.push('Job record (for your log): ' + jm.join(', ')); }
+  if (!S.cf_vin) miss.push('Final check: confirm the VIN against the vehicle');
+  if (!S.cf_odo && !S.odo_none) miss.push('Final check: confirm the odometer and unit');
   const st = S.st;
   const stMiss = [];
   if (!st.name) stMiss.push('name'); if (!st.lic) stMiss.push('license #'); if (!st.addr && !st._loc) stMiss.push('address');
@@ -160,6 +164,7 @@ function refresh() {
     else { setStatus(ds, 'bad', '✗ Document VIN differs from the vehicle VIN.'); if (!$('s8_cond').dataset.touched) $('s8_cond').value = 'disagrees'; }
   } else setStatus(ds, '', '');
 
+  renderFinal(collect());
   const E = evaluate(collect());
   showList($('stopBox'), 'Do not sign this as a private verifier:', E.stops, true);
   showList($('missBox'), 'Still needed before the form can be created:', E.miss, false);
@@ -170,6 +175,18 @@ function refresh() {
   $('make_pdf').disabled = E.stops.length > 0 || E.miss.length > 0;
   $('make_dnp').classList.toggle('hidden', E.stops.length === 0);
   saveDraft();
+}
+let lastFinal = '';
+function renderFinal(S) {
+  const key = S.vin + '|' + S.odo + '|' + S.odo_unit + '|' + S.odo_none;
+  if (lastFinal && key !== lastFinal) { $('cf_vin').checked = false; $('cf_odo').checked = false; }
+  lastFinal = key;
+  const box = $('vinBig'); box.innerHTML = '';
+  (S.vin || '').split('').forEach((ch, i) => { const s = document.createElement('span'); s.textContent = ch; const n = document.createElement('i'); n.textContent = i + 1; s.appendChild(n); box.appendChild(s); });
+  const th = document.querySelector('.photoRow[data-photo="vin"] .thumb');
+  $('finalThumb').classList.toggle('hidden', !(th && th.src && !th.classList.contains('hidden')));
+  if (th && th.src) $('finalThumb').src = th.src;
+  $('odoBig').textContent = S.odo_none ? 'Odometer: none / not applicable' : 'Odometer: ' + (S.odo || '—') + ' ' + (S.odo_unit || '');
 }
 function showList(el, title, arr, isStop) {
   el.classList.toggle('hidden', !arr.length);
@@ -244,19 +261,38 @@ function renderLog() {
   log.slice().reverse().forEach((j) => {
     const d = document.createElement('div'); d.className = 'logitem';
     const b = document.createElement('b'); b.textContent = j.vin || '(no VIN)';
-    d.appendChild(b); d.appendChild(document.createTextNode('  ' + (j.vehicle || '') + ' · ' + (j.city || '') + ' · ' + (j.date || '') + (j.dnp ? ' · REFERRED' : '')));
+    d.appendChild(b); d.appendChild(document.createTextNode('  ' + (j.vehicle || '') + ' · ' + (j.requester || '') + (j.fee ? ' · $' + j.fee : '') + ' · ' + (j.city || '') + ' · ' + (j.date || '') + (j.dnp ? ' · REFERRED' : '')));
     box.appendChild(d);
   });
 }
 function logJob(S, dnp) {
   const log = LS.get('vvt_reg31_log', []);
-  log.push({ date: today(), vin: S.vin, vehicle: [S.year, S.make, S.model].filter(Boolean).join(' '), city: S.loc_mode === 'above' ? S.st.city : S.loc_city, dnp: !!dnp });
+  log.push({ date: today(), vin: S.vin, vehicle: [S.year, S.make, S.model].filter(Boolean).join(' '), year: S.year, make: S.make, model: S.model,
+    plate: S.plate_type === 'plate' ? S.plate_no : '', plateState: S.plate_type === 'plate' ? S.plate_state : '', lastReg: S.lastreg,
+    requester: S.req_name, requesterAddr: S.req_addr, fee: S.fee, odo: S.odo_none ? 'none' : (S.odo + ' ' + S.odo_unit),
+    where: [S.loc_street, S.loc_city, S.loc_state].filter(Boolean).join(', '), city: S.loc_mode === 'above' ? S.st.city : S.loc_city,
+    form: 'REG 31 Rev. 5/2025', tool: TOOL_VER, dnp: !!dnp });
   LS.set('vvt_reg31_log', log);
+  renderBackupMsg();
+}
+const TOOL_VER = '2026-10-26';
+function renderBackupMsg() {
+  const n = LS.get('vvt_reg31_log', []).length, last = LS.get('vvt_reg31_backup', { n: 0, at: '' });
+  const el = $('backupMsg'); if (!el) return;
+  const behind = n - (last.n || 0);
+  el.textContent = n ? (last.at ? 'Last backup: ' + last.at + ' (' + last.n + ' jobs). ' : 'No backup yet. ') + (behind > 0 ? behind + ' job' + (behind > 1 ? 's' : '') + ' not backed up. Save a backup file and keep it somewhere other than this phone (email it to yourself or put it in cloud storage).' : 'Everything is backed up.') : '';
+  $('btnLog').textContent = behind >= 3 ? 'Job log ⚠' : 'Job log';
+}
+function logBackup() {
+  const log = LS.get('vvt_reg31_log', []);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: 'reg31-assistant', exported: new Date().toISOString(), jobs: log }, null, 1)], { type: 'application/json' }));
+  a.download = 'reg31-backup-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+  LS.set('vvt_reg31_backup', { n: log.length, at: today() }); renderBackupMsg();
 }
 function logCsv() {
   const log = LS.get('vvt_reg31_log', []);
   const q = (v) => '"' + String(v || '').replace(/"/g, '""') + '"';
-  const csv = ['date,vin,vehicle,city,referred'].concat(log.map((j) => [j.date, j.vin, j.vehicle, j.city, j.dnp ? 'yes' : ''].map(q).join(','))).join('\n');
+  const csv = ['date,vin,year,make,model,plate,plate state,last registered,requester,requester address,fee,odometer,verified at,form,referred'].concat(log.map((j) => [j.date, j.vin, j.year, j.make, j.model, j.plate, j.plateState, j.lastReg, j.requester, j.requesterAddr, j.fee, j.odo, j.where || j.city, j.form, j.dnp ? 'yes' : ''].map(q).join(','))).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'reg31-job-log.csv'; a.click();
 }
 
@@ -733,7 +769,8 @@ function init() {
   $('btnSettings').onclick = () => { $('settingsCard').classList.toggle('hidden'); $('logCard').classList.add('hidden'); };
   $('btnLog').onclick = () => { renderLog(); $('logCard').classList.toggle('hidden'); $('settingsCard').classList.add('hidden'); };
   $('saveSettings').onclick = saveSettingsUI;
-  $('logCsv').onclick = logCsv;
+  $('logCsv').onclick = logCsv; $('logBackup').onclick = logBackup; renderBackupMsg();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   $('logClear').onclick = () => { if ($('logClear').dataset.arm) { LS.del('vvt_reg31_log'); delete $('logClear').dataset.arm; $('logClear').textContent = 'Clear log'; renderLog(); } else { $('logClear').dataset.arm = '1'; $('logClear').textContent = 'Tap again to confirm'; setTimeout(() => { delete $('logClear').dataset.arm; $('logClear').textContent = 'Clear log'; }, 4000); } };
   const make = async (dnp) => {
     const S = collect();

@@ -53,3 +53,10 @@ a.primary.linkbtn{color:#fff}
 .modal-in{background:#fff;border-radius:12px;padding:10px;max-width:800px}
 #cropCv{width:100%;touch-action:none;border-radius:6px;display:block}
 .boxbtn{padding:8px 10px;font-size:14px}
+.finalcheck{border:2px solid var(--orange);border-radius:10px;padding:10px;margin:10px 0;background:#FFF8F2}
+.thumb.big{height:84px}
+.vinbig{display:flex;flex-wrap:wrap;gap:2px;font:700 20px ui-monospace,Menlo,monospace}
+.vinbig span{display:inline-block;text-align:center;min-width:1.15em}
+.vinbig span i{display:block;font:500 9px sans-serif;color:#6B7A99}
+.odobig{font:700 22px ui-monospace,Menlo,monospace;margin:8px 0 2px}
+.finalRow{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap}

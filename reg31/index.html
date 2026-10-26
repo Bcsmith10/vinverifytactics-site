@@ -42,8 +42,10 @@
 <!-- Job log -->
 <section id="logCard" class="card hidden">
   <h2>Job log <span class="tag">this phone only</span></h2>
+  <div id="backupMsg" class="note"></div>
   <div id="logList" class="loglist"></div>
   <div class="row">
+    <button type="button" id="logBackup" class="primary">Save backup file</button>
     <button type="button" id="logCsv" class="ghost">Download CSV</button>
     <button type="button" id="logClear" class="ghost danger">Clear log</button>
   </div>
@@ -363,11 +365,29 @@
   </div>
 </section>
 
+<section class="card" id="jobCard">
+  <h2>Job record <span class="tag">for your log</span></h2>
+  <p class="note">California requires you to keep a record of each verification: who asked, the fee, the vehicle, plate, and the state it was last registered in. These are saved in your job log, not printed on the form.</p>
+  <div class="grid">
+    <label class="full">Person requesting the verification (name)<input id="req_name" autocomplete="off"></label>
+    <label class="full">Their address<input id="req_addr" autocomplete="off"></label>
+    <label>Fee charged ($)<input id="fee" inputmode="decimal" autocomplete="off"></label>
+    <label>State last registered<input id="lastreg" maxlength="12" autocapitalize="characters" autocomplete="off" placeholder="e.g. TX, or NONE"></label>
+  </div>
+</section>
+
 <section class="card" id="resultCard">
   <h2>Create the form</h2>
   <div id="stopBox" class="stop hidden"></div>
   <div id="missBox" class="miss hidden"></div>
   <div id="warnBox" class="warn hidden"></div>
+  <div id="finalCheck" class="finalcheck">
+    <h3>Final check: read the vehicle one more time</h3>
+    <div class="finalRow"><img id="finalThumb" class="thumb big hidden" alt=""><div id="vinBig" class="vinbig"></div></div>
+    <label class="chk"><input type="checkbox" id="cf_vin"> I compared every character of this VIN against the VIN on the vehicle itself, not just the photo.</label>
+    <div id="odoBig" class="odobig"></div>
+    <label class="chk"><input type="checkbox" id="cf_odo"> This is the total odometer (not a trip meter) and the unit is right.</label>
+  </div>
   <button type="button" id="make_pdf" class="primary big">Create REG 31 PDF</button>
   <button type="button" id="make_dnp" class="ghost danger hidden">Create anyway, marked DO NOT PROCESS – REFER TO CHP</button>
   <div id="pdfOut" class="hidden">
