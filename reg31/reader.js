@@ -98,7 +98,7 @@ function otsu(hist, total) {
 }
 
 // Crop a region, flatten the lighting, binarize, drop specks, return a clean dark-on-white canvas for OCR.
-function cleanCrop(img, box, sign, lineH) {
+function cleanCrop(img, box, sign, lineH, trimPrefix, outH) {
   const pad = Math.round(lineH * 0.35);
   const x0 = Math.max(0, box.x0 - pad), y0 = Math.max(0, box.y0 - pad), x1 = Math.min(img.w - 1, box.x1 + pad), y1 = Math.min(img.h - 1, box.y1 + pad);
   const w = x1 - x0 + 1, h = y1 - y0 + 1;
@@ -122,19 +122,26 @@ function cleanCrop(img, box, sign, lineH) {
   const cys = ok.map((c) => (c.y0 + c.y1) / 2).sort((a, b) => a - b), med = cys[cys.length >> 1];
   ok = ok.filter((c) => Math.abs((c.y0 + c.y1) / 2 - med) < 0.3 * lineH && c.h >= lineH * 0.6);
   if (!ok.length) return null;
+  if (trimPrefix && ok.length > 17) { // drop a short leading word such as "VIN" separated by a wide gap
+    const so = ok.slice().sort((a, b) => a.x0 - b.x0);
+    for (let k = 1; k <= 4 && k < so.length; k++) {
+      const gap = so[k].x0 - so[k - 1].x1;
+      if (gap > lineH * 0.9 && so.length - k >= 15) { const cut = so[k].x0; ok = ok.filter((c) => c.x0 >= cut); break; }
+    }
+  }
   const gx0 = Math.min.apply(null, ok.map((c) => c.x0)), gx1 = Math.max.apply(null, ok.map((c) => c.x1));
   const gy0 = Math.min.apply(null, ok.map((c) => c.y0)), gy1 = Math.max.apply(null, ok.map((c) => c.y1));
   // paint kept components (bbox-bounded) from the mask
   for (const c of ok) for (let y = c.y0; y <= c.y1; y++) for (let x = c.x0; x <= c.x1; x++) { const i = y * w + x; if (mask[i]) keep[i] = 1; }
   const cw = gx1 - gx0 + 1, ch = gy1 - gy0 + 1;
-  const target = 64 / ch; const B = 28;
-  const out = document.createElement('canvas'); out.width = Math.round(cw * target) + B * 2; out.height = 64 + B * 2;
+  const OH = outH || 64; const target = OH / ch; const B = Math.round(OH * 0.44);
+  const out = document.createElement('canvas'); out.width = Math.round(cw * target) + B * 2; out.height = OH + B * 2;
   const tmp = document.createElement('canvas'); tmp.width = cw; tmp.height = ch;
   const tg = tmp.getContext('2d'); const id = tg.createImageData(cw, ch);
   for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const v = keep[(gy0 + y) * w + gx0 + x] ? 0 : 255; const k = (y * cw + x) * 4; id.data[k] = id.data[k + 1] = id.data[k + 2] = v; id.data[k + 3] = 255; }
   tg.putImageData(id, 0, 0);
   const og = out.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, out.width, out.height);
-  og.imageSmoothingEnabled = true; og.drawImage(tmp, B, B, Math.round(cw * target), 64);
+  og.imageSmoothingEnabled = true; og.drawImage(tmp, B, B, Math.round(cw * target), OH);
   return out;
 }
 
@@ -146,5 +153,15 @@ function findLinesIn(img, box, sign) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) gray[y * w + x] = img.gray[(y0 + y) * img.w + x0 + x];
   return findLines({ w, h, gray }, sign, 1.0).map((L) => Object.assign({}, L, { x0: L.x0 + x0, x1: L.x1 + x0, y0: L.y0 + y0, y1: L.y1 + y0 }));
 }
-window.Reader = { toGray, findLines, findLinesIn, cleanCrop, MAXW };
+// grayscale copy with the lighting flattened (helps reading whole labels and documents)
+function flatCanvas(img) {
+  const { w, h, gray } = img;
+  const bg = boxBlur(gray, w, h, 40);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); const id = g.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) { const v = Math.max(0, Math.min(255, 128 + (gray[i] / Math.max(1, bg[i]) * 128 - 128) * 1.8)); id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; }
+  g.putImageData(id, 0, 0);
+  return c;
+}
+window.Reader = { toGray, findLines, findLinesIn, cleanCrop, flatCanvas, MAXW };
 })();

@@ -492,6 +492,8 @@ function vinCandidates(raw) {
     }
     if (fixes.length === 1) repaired.push(fixes[0]);
   });
+  // a label line such as "VIN 1N4..." can arrive glued together: accept a 17-character end or start only if it passes the check digit
+  toks.forEach((t) => { if (t.length > 17 && t.length <= 21) [t.slice(-17), t.slice(0, 17)].forEach((w) => { if (vinValid(w) && !good.includes(w)) good.push(w); }); });
   const odd = toks.filter((t) => t.length >= 14 && t.length <= 20 && t.length !== 17).slice(0, 2);
   return { good: Array.from(new Set(good)).slice(0, 3), repaired: Array.from(new Set(repaired)).slice(0, 3), odd };
 }
@@ -517,16 +519,20 @@ async function ocrCanvas(cv, params) {
 const VIN_WL = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789';
 async function readVinFromLines(img, extraLines) {
   let lines = extraLines || [];
-  if (!lines.length) lines = Reader.findLines(img, 1).concat(Reader.findLines(img, -1)).filter((L) => L.n >= 15 && L.n <= 19);
+  if (!lines.length) lines = Reader.findLines(img, 1).concat(Reader.findLines(img, -1)).filter((L) => L.n >= 15 && L.n <= 24);
   lines.sort((a, b) => Math.abs(a.n - 17) - Math.abs(b.n - 17) || b.mh - a.mh);
-  const res = { good: [], repaired: [], odd: [] };
+  const res = { good: [], repaired: [], odd: [], raw: [] };
+  const norm = (s) => s.toUpperCase().replace(/[^A-Z0-9 \n]/g, ' ').split(/\s+/).filter(Boolean).map((t) => t.replace(/O/g, '0').replace(/I/g, '1').replace(/Q/g, '0'));
   for (const L of lines.slice(0, 6)) {
-    const cv = Reader.cleanCrop(img, L, L.sign, L.mh); if (!cv) continue;
+    for (const [trim, oh] of (L.n > 17 ? [[true, 64], [true, 32], [false, 64]] : [[false, 64], [false, 32]])) {
+    const cv = Reader.cleanCrop(img, L, L.sign, L.mh, trim, oh); if (!cv) continue;
     for (const psm of ['8', '7']) {
       const t = await ocrCanvas(cv, { tessedit_char_whitelist: VIN_WL, tessedit_pageseg_mode: psm });
-      const r = vinCandidates(t);
+      const r = vinCandidates(t); res.raw.push(...norm(t));
       res.good.push(...r.good); res.repaired.push(...r.repaired); res.odd.push(...r.odd);
       if (r.good.length) break;
+    }
+    if (res.good.length) break;
     }
     if (res.good.length) break;
   }
@@ -573,6 +579,49 @@ function applyOdo(found, stat) {
   stat.textContent = 'Read from photo: ' + f.digits + (f.unit ? ' ' + f.unit : '') + ' — make sure this is the odometer, not a trip meter or range.';
 }
 
+
+async function fullText(img, psm) {
+  const fc = Reader.flatCanvas(img);
+  return (await ocrCanvas(fc, { tessedit_char_whitelist: '', tessedit_pageseg_mode: psm || '12' })).toUpperCase();
+}
+const PICKUP_BTM = ['PK', 'PC', '3C', '4C', 'SP'];
+async function readLabelPhoto(img, stat) {
+  const [vinRes, text] = [await readVinFromLines(img), await fullText(img)];
+  const notes = [];
+  const typed = ($('vin').value || '').toUpperCase();
+  let read = vinRes.good[0];
+  const subseq = (a, b) => { let i = 0; for (const ch of b) if (ch === a[i]) i++; return i === a.length; };
+  if (!read && typed.length === 17 && vinRes.raw.some((t) => t.length >= 17 && t.length <= 20 && subseq(typed, t))) read = typed;
+  if (read && typed) {
+    if (read === typed) { $('s6_status').value = 'agrees'; notes.push('VIN on the label matches the vehicle'); }
+    else { $('s6_status').value = 'disagrees'; notes.push('VIN on the label (' + read + ') does NOT match the vehicle VIN'); }
+  } else if (read) notes.push('label VIN read as ' + read + ' — enter the vehicle VIN to compare');
+  else notes.push('could not read the VIN on the label — set the status yourself');
+  if (/FEDERAL|FMVSS|MOTOR VEHICLE SAFETY/.test(text)) { $('s6_ind').value = 'fmvss'; notes.push('says it meets US FMVSS'); }
+  else if (/CMVSS|CANADA|CANADIAN/.test(text)) { $('s6_ind').value = 'other'; notes.push('shows another country\'s standards'); }
+  const g = text.match(/GVWR[^0-9]{0,14}(\d[\d,.]{2,6})\s*(KG|LBS?)?[^0-9]{0,8}\(?(\d[\d,.]{2,6})?\s*(KG|LBS?)?/);
+  if (g) {
+    const nums = [[g[1], g[2]], [g[3], g[4]]].filter((x) => x[0]).map((x) => ({ n: Number(x[0].replace(/[,.]/g, '')), u: x[1] || '' }));
+    let lbs = (nums.find((x) => /LB/.test(x.u)) || {}).n;
+    if (!lbs && nums[0] && /KG/.test(nums[0].u)) lbs = Math.round(nums[0].n * 2.2046);
+    if (lbs) { notes.push('GVWR ' + lbs + ' lb'); if (PICKUP_BTM.includes(($('btm').value || '').toUpperCase())) $('gvwr').value = String(lbs); }
+  }
+  const d = text.match(/DATE[:\s]*([01]?\d\s*[\/-]\s*\d{2,4})/);
+  if (d) notes.push('built ' + d[1].replace(/\s/g, ''));
+  stat.textContent = 'From the label: ' + notes.join(' · ') + '. Confirm against the car.';
+}
+async function readDocPhoto(img, kind, stat) {
+  const vinRes = await readVinFromLines(img);
+  applyVin(kind, vinRes, stat);
+  const text = await fullText(img);
+  let t = '';
+  if (/SALVAGE/.test(text)) t = 'salvage';
+  else if (/MANUFACTURER.?S (CERTIFICATE|STATEMENT)|\bMSO\b|\bMCO\b/.test(text)) t = 'msomco';
+  else if (/CERTIFICATE OF TITLE|\bTITLE\b/.test(text)) t = 'title';
+  else if (/REGISTRATION/.test(text)) t = 'reg';
+  if (t) { $('s8_type').value = t; stat.textContent += ' Document looks like: ' + $('s8_type').selectedOptions[0].text + '.'; }
+}
+
 async function handlePhoto(kind, file, row) {
   const th = row.querySelector('.thumb'); th.src = URL.createObjectURL(file); th.classList.remove('hidden');
   const stat = row.querySelector('.ocrstat');
@@ -586,20 +635,26 @@ async function handlePhoto(kind, file, row) {
       photoCache[ocrKind] = { img, cv, row };
       row.querySelector('.boxbtn').classList.remove('hidden');
       if (ocrKind === 'odo') applyOdo(await readOdoFromLines(img), stat);
+      else if (ocrKind === 'docvin') await readDocPhoto(img, ocrKind, stat);
       else applyVin(ocrKind, await readVinFromLines(img), stat);
+    } else if (ocrKind === 'label') {
+      const cv = await fileToCanvas(file); const img = Reader.toGray(cv, Reader.MAXW);
+      await readLabelPhoto(img, stat);
     } else if (ocrKind === 'emis') {
-      const raw = await ocr(file, { tessedit_char_whitelist: '' });
-      const up = raw.toUpperCase();
+      const cv = await fileToCanvas(file); const img = Reader.toGray(cv, Reader.MAXW);
+      const up = await fullText(img);
       const ca = /CALIFORNIA/.test(up), epa = /EPA|ENVIRONMENTAL PROTECTION|FEDERAL/.test(up);
       let hint = '';
-      if (ca && epa) { hint = 'Label text mentions both California and EPA/federal.'; if (!$('s9').value) $('s9').value = 'both'; }
-      else if (ca) { hint = 'Label text mentions California.'; if (!$('s9').value) $('s9').value = 'ca'; }
-      else if (epa) { hint = 'Label text mentions EPA/federal.'; if (!$('s9').value) $('s9').value = 'epa'; }
+      if (ca && epa) { hint = 'Label text mentions both California and EPA/federal.'; $('s9').value = 'both'; }
+      else if (ca) { hint = 'Label text mentions California.'; $('s9').value = 'ca'; }
+      else if (epa) { hint = 'Label text mentions EPA/federal.'; $('s9').value = 'epa'; }
       else hint = 'Could not tell from the photo.';
-      setStatus($('emisHint'), 'warnx', hint + ' Suggestion only — read the label and set the choice yourself.');
+      setStatus($('emisHint'), 'warnx', hint + ' Confirm by reading the label.');
       const toks = (up.match(/\b[A-Z0-9][A-Z0-9.\-]{8,15}[A-Z0-9]\b/g) || []).filter((t) => /\d/.test(t) && /[A-Z]/.test(t)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 6);
       chips('emisChips', toks, (v) => { $('s9_family').value = v; refresh(); });
-      stat.textContent = toks.length ? 'Tap the engine family / test group number if you see it.' : 'Type the engine family / test group number.';
+      const anch = up.match(/(?:ENGINE\s*FAMILY|TEST\s*GROUP|FAMILY)\s*(?:NO\.?|NUMBER|#)?\s*[:#]?\s*([A-Z0-9][A-Z0-9.\-]{7,15}[A-Z0-9])/);
+      if (anch) { $('s9_family').value = anch[1]; stat.textContent = 'Read from label: ' + anch[1] + ' — confirm it against the label.'; }
+      else stat.textContent = toks.length ? 'Tap the engine family / test group number if you see it.' : 'Type the engine family / test group number.';
     }
   } catch (e) {
     stat.textContent = 'Photo reading is not available right now. Type the value instead.';
