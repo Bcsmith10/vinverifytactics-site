@@ -379,8 +379,18 @@
 
 </main>
 
+<div id="cropModal" class="modal hidden">
+  <div class="modal-in">
+    <p id="cropMsg" class="note"></p>
+    <canvas id="cropCv"></canvas>
+    <div class="row"><button type="button" id="cropGo" class="primary">Read this</button><button type="button" id="cropCancel" class="ghost">Cancel</button></div>
+  </div>
+</div>
+
+
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/pdf.min.js"></script>
+<script src="reader.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

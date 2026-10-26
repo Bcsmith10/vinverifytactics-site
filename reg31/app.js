@@ -500,6 +500,79 @@ function chips(boxId, arr, onPick, cls) {
   arr.forEach((v) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = v; b.onclick = () => onPick(v); box.appendChild(b); });
 }
 
+
+/* ---- Line-finding reader (reader.js) ---- */
+async function fileToCanvas(file) {
+  const bmp = await createImageBitmap(file);
+  const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  return c;
+}
+async function ocrCanvas(cv, params) {
+  const w = await getWorker();
+  await w.setParameters(Object.assign({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '7' }, params || {}));
+  const r = await w.recognize(cv);
+  return (r.data.text || '').trim();
+}
+const VIN_WL = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789';
+async function readVinFromLines(img, extraLines) {
+  let lines = extraLines || [];
+  if (!lines.length) lines = Reader.findLines(img, 1).concat(Reader.findLines(img, -1)).filter((L) => L.n >= 15 && L.n <= 19);
+  lines.sort((a, b) => Math.abs(a.n - 17) - Math.abs(b.n - 17) || b.mh - a.mh);
+  const res = { good: [], repaired: [], odd: [] };
+  for (const L of lines.slice(0, 6)) {
+    const cv = Reader.cleanCrop(img, L, L.sign, L.mh); if (!cv) continue;
+    for (const psm of ['8', '7']) {
+      const t = await ocrCanvas(cv, { tessedit_char_whitelist: VIN_WL, tessedit_pageseg_mode: psm });
+      const r = vinCandidates(t);
+      res.good.push(...r.good); res.repaired.push(...r.repaired); res.odd.push(...r.odd);
+      if (r.good.length) break;
+    }
+    if (res.good.length) break;
+  }
+  const u = (a) => Array.from(new Set(a));
+  res.good = u(res.good); res.repaired = u(res.repaired).filter((x) => !res.good.includes(x)); res.odd = u(res.odd);
+  return res;
+}
+async function readOdoFromLines(img, extraLines) {
+  let lines = extraLines || [];
+  if (!lines.length) lines = Reader.findLines(img, 1).concat(Reader.findLines(img, -1)).filter((L) => L.n >= 3 && L.n <= 14);
+  lines.sort((a, b) => b.n - a.n || b.mh - a.mh);
+  const found = [];
+  for (const L of lines.slice(0, 10)) {
+    const cv = Reader.cleanCrop(img, L, L.sign, L.mh); if (!cv) continue;
+    const t = (await ocrCanvas(cv, { tessedit_pageseg_mode: '7' })).replace(/(\d)[,\s](?=\d{3}(?!\d))/g, '$1');
+    const m = t.match(/(\d{4,7})\s*(miles?|mi|km|kilometers?)?/i);
+    if (m) found.push({ digits: m[1], unit: m[2] ? (/k/i.test(m[2]) ? 'km' : 'miles') : '', mh: L.mh, text: t });
+  }
+  found.sort((a, b) => (b.unit ? 1 : 0) - (a.unit ? 1 : 0) || (Number(b.digits.length >= 5) - Number(a.digits.length >= 5)) || Number(b.digits) - Number(a.digits));
+  return found;
+}
+const photoCache = {};
+
+
+function applyVin(kind, c, stat) {
+  if (kind === 'vin') {
+    chips('vinChips', c.good.concat(c.repaired), (v) => { $('vin').value = v; refresh(); });
+    if (c.good.length) { $('vin').value = c.good[0]; stat.textContent = 'Read from photo — check it against the plate, character by character.'; }
+    else if (c.repaired.length) stat.textContent = 'Not sure about one character. Tap the suggestion only if it matches the plate, or tap "Box the text" and try again.';
+    else if (c.odd.length) stat.textContent = 'Read "' + c.odd[0] + '" (' + c.odd[0].length + ' characters) — not a valid VIN. Type it, or tap "Box the text" and try again.';
+    else stat.textContent = 'Could not find the VIN. Tap "Box the text" to point at it, or type it.';
+  } else {
+    if (c.good.length) { $('docvin').value = c.good[0]; stat.textContent = 'Read from the document — check it against the photo.'; }
+    else stat.textContent = 'Could not find a VIN on the document. Tap "Box the text", or type it.';
+  }
+}
+function applyOdo(found, stat) {
+  chips('odoChips', found.map((f) => f.digits).filter((x, i, a) => a.indexOf(x) === i).slice(0, 4), (v) => { $('odo').value = v.slice(-6); refresh(); });
+  if (!found.length) { stat.textContent = 'Could not find the odometer digits. Tap "Box the text", or type it.'; return; }
+  const f = found[0];
+  $('odo').value = f.digits.slice(-6);
+  if (f.unit) $('odo_unit').value = f.unit;
+  if (f.digits.length === 6 || f.digits.length === 5) $('odo_digits').value = String(f.digits.length);
+  stat.textContent = 'Read from photo: ' + f.digits + (f.unit ? ' ' + f.unit : '') + ' — make sure this is the odometer, not a trip meter or range.';
+}
+
 async function handlePhoto(kind, file, row) {
   const th = row.querySelector('.thumb'); th.src = URL.createObjectURL(file); th.classList.remove('hidden');
   const stat = row.querySelector('.ocrstat');
@@ -507,32 +580,13 @@ async function handlePhoto(kind, file, row) {
   if (!ocrKind) return;
   stat.textContent = 'Reading photo… (first time can take a few seconds)';
   try {
-    if (ocrKind === 'vin' || ocrKind === 'docvin') {
-      const wl = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789 -';
-      let c = { good: [], repaired: [], odd: [] };
-      for (const psm of ['7', '11']) {
-        const raw = await ocr(file, { tessedit_char_whitelist: wl, tessedit_pageseg_mode: psm });
-        const r = vinCandidates(raw);
-        c = { good: c.good.concat(r.good), repaired: c.repaired.concat(r.repaired), odd: c.odd.concat(r.odd) };
-        if (c.good.length) break;
-      }
-      const uniq = (a) => Array.from(new Set(a));
-      c.good = uniq(c.good); c.repaired = uniq(c.repaired).filter((x) => !c.good.includes(x)); c.odd = uniq(c.odd);
-      if (ocrKind === 'vin') {
-        chips('vinChips', c.good.concat(c.repaired), (v) => { $('vin').value = v; refresh(); });
-        if (c.good.length) { $('vin').value = c.good[0]; stat.textContent = 'Read a VIN that passes the check digit. Compare it to the photo, character by character.'; }
-        else if (c.repaired.length) stat.textContent = 'The photo read had one doubtful character. Tap the suggestion only if it matches the car.';
-        else if (c.odd.length) stat.textContent = 'Photo read "' + c.odd[0] + '" (' + c.odd[0].length + ' characters) — not a valid VIN. Retake closer with less glare, or type it.';
-        else stat.textContent = 'Could not read a VIN. Retake closer, with less glare, or type it.';
-      } else {
-        if (c.good.length) { $('docvin').value = c.good[0]; stat.textContent = 'Read a VIN from the document. Compare it to the photo.'; }
-        else stat.textContent = 'Could not read a VIN from the document. Type it.';
-      }
-    } else if (ocrKind === 'odo') {
-      const raw = await ocr(file, { tessedit_char_whitelist: '0123456789' });
-      const runs = (raw.match(/\d{4,7}/g) || []).filter((x, i, a) => a.indexOf(x) === i).slice(0, 4);
-      chips('odoChips', runs, (v) => { $('odo').value = v.slice(-6); refresh(); });
-      if (runs.length) { stat.textContent = 'Tap the number that matches the dash. Type it if none do.'; } else stat.textContent = 'Could not read digits. Type it.';
+    if (ocrKind === 'vin' || ocrKind === 'docvin' || ocrKind === 'odo') {
+      const cv = await fileToCanvas(file);
+      const img = Reader.toGray(cv, Reader.MAXW);
+      photoCache[ocrKind] = { img, cv, row };
+      row.querySelector('.boxbtn').classList.remove('hidden');
+      if (ocrKind === 'odo') applyOdo(await readOdoFromLines(img), stat);
+      else applyVin(ocrKind, await readVinFromLines(img), stat);
     } else if (ocrKind === 'emis') {
       const raw = await ocr(file, { tessedit_char_whitelist: '' });
       const up = raw.toUpperCase();
@@ -553,9 +607,52 @@ async function handlePhoto(kind, file, row) {
   refresh();
 }
 
+
+/* ---- "Box the text" fallback ---- */
+const crop = { kind: null, rect: null, drag: null, scale: 1 };
+function openCrop(kind) {
+  const pc = photoCache[kind]; if (!pc) return;
+  crop.kind = kind; crop.rect = null;
+  const cvs = $('cropCv'); const maxW = Math.min(window.innerWidth - 24, 760);
+  crop.scale = maxW / pc.cv.width; cvs.width = maxW; cvs.height = Math.round(pc.cv.height * crop.scale);
+  drawCrop(); $('cropModal').classList.remove('hidden'); $('cropMsg').textContent = 'Drag a box tightly around the characters.';
+}
+function drawCrop() {
+  const pc = photoCache[crop.kind], cvs = $('cropCv'), g = cvs.getContext('2d');
+  g.drawImage(pc.cv, 0, 0, cvs.width, cvs.height);
+  if (crop.rect) { const r = crop.rect; g.strokeStyle = '#F26A0F'; g.lineWidth = 3; g.strokeRect(r.x, r.y, r.w, r.h); }
+}
+function wireCrop() {
+  const cvs = $('cropCv');
+  const pos = (e) => { const b = cvs.getBoundingClientRect(); return { x: (e.clientX - b.left) * cvs.width / b.width, y: (e.clientY - b.top) * cvs.height / b.height }; };
+  cvs.addEventListener('pointerdown', (e) => { cvs.setPointerCapture(e.pointerId); crop.drag = pos(e); crop.rect = { x: crop.drag.x, y: crop.drag.y, w: 0, h: 0 }; });
+  cvs.addEventListener('pointermove', (e) => { if (!crop.drag) return; const p = pos(e); crop.rect = { x: Math.min(crop.drag.x, p.x), y: Math.min(crop.drag.y, p.y), w: Math.abs(p.x - crop.drag.x), h: Math.abs(p.y - crop.drag.y) }; drawCrop(); });
+  const up = () => { crop.drag = null; };
+  cvs.addEventListener('pointerup', up); cvs.addEventListener('pointercancel', up);
+  $('cropCancel').onclick = () => $('cropModal').classList.add('hidden');
+  $('cropGo').onclick = async () => {
+    const r = crop.rect; if (!r || r.w < 20 || r.h < 8) { $('cropMsg').textContent = 'Draw a box around the characters first.'; return; }
+    const pc = photoCache[crop.kind]; const k = pc.img.w / $('cropCv').width;
+    const box = { x0: Math.round(r.x * k), y0: Math.round(r.y * k), x1: Math.round((r.x + r.w) * k), y1: Math.round((r.y + r.h) * k) };
+    const lh = Math.max(14, (box.y1 - box.y0) * 0.7);
+    const need = crop.kind === 'odo' ? 3 : 10;
+    const mk = (sign) => {
+      const found = Reader.findLinesIn(pc.img, box, sign).filter((L) => L.n >= need && L.n <= (crop.kind === 'odo' ? 14 : 19)).sort((a, b) => b.mh * b.n - a.mh * a.n)[0];
+      return found ? Object.assign({}, found, { n: crop.kind === 'odo' ? found.n : 17 }) : Object.assign({ n: 17, mh: lh, sign }, box);
+    };
+    $('cropMsg').textContent = 'Reading…'; $('cropGo').disabled = true;
+    const stat = pc.row.querySelector('.ocrstat');
+    try {
+      if (crop.kind === 'odo') applyOdo(await readOdoFromLines(pc.img, [mk(1), mk(-1)]), stat);
+      else applyVin(crop.kind, await readVinFromLines(pc.img, [mk(1), mk(-1)]), stat);
+    } catch (e) { stat.textContent = 'Could not read that box. Type the value instead.'; }
+    $('cropGo').disabled = false; $('cropModal').classList.add('hidden'); refresh();
+  };
+}
+
 /* ---------------- Wire up ---------------- */
 function init() {
-  loadSettingsUI();
+  loadSettingsUI(); wireCrop();
   loadDraft();
   if (!$('exec_date').value) $('exec_date').value = today();
   document.querySelectorAll('input, select, textarea').forEach((el) => {
@@ -568,6 +665,10 @@ function init() {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.className = 'hidden';
     row.appendChild(inp);
     row.querySelector('.cam').addEventListener('click', () => inp.click());
+    if (['vin', 'docvin', 'odo'].includes(row.dataset.ocr)) {
+      const bb = document.createElement('button'); bb.type = 'button'; bb.className = 'ghost boxbtn hidden'; bb.textContent = '✂ Box the text';
+      bb.addEventListener('click', () => openCrop(row.dataset.ocr)); row.insertBefore(bb, row.querySelector('.ocrstat'));
+    }
     inp.addEventListener('change', () => { if (inp.files && inp.files[0]) handlePhoto(row.dataset.photo, inp.files[0], row); });
   });
   $('btnSettings').onclick = () => { $('settingsCard').classList.toggle('hidden'); $('logCard').classList.add('hidden'); };
