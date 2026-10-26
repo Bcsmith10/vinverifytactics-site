@@ -57,6 +57,8 @@ function collect() {
 }
 function settings() { return Object.assign({ name:'', lic:'', addr:'', city:'', state:'CA', phone:'', email:'', useloc:true }, LS.get('vvt_reg31_settings', {})); }
 
+const MAKE_WMI = {"NISSAN": "1N4 1N6 JN1 JN8 3N1 5N1", "TOYOTA": "JT2 JT3 JT4 JTD JTE JTK JTM JTN 4T1 4T3 4T4 2T1 2T3 5TD 5TE 5TF 5TB 3TM 3TY", "LEXUS": "JTH JTJ 2T2", "HONDA": "1HG 2HG JHM 19X 3HG 5J6 5FN 2HK JHL 5FR JH2", "ACURA": "19U JH4", "FORD": "1FA 1FB 1FC 1FD 1FM 1FT 2FA 2FM 2FT 3FA 3FT 1ZV WF0", "CHEVROLET": "1G1 1GC 2G1 3G1 KL1 3GN 1GN 3GC", "GMC": "1GT 3GT 2GT 1GK", "BUICK": "1G4", "CADILLAC": "1G6", "HYUNDAI": "KMH 5NP 5NM KM8", "KIA": "KNA KND KNM 5XY 5XX 3KP", "SUBARU": "JF1 JF2 4S3 4S4", "MAZDA": "JM1 JM3 3MZ 3MD 4F2", "MITSUBISHI": "JA3 JA4 4A3 4A4", "VOLKSWAGEN": "1VW 3VW WVW WVG", "AUDI": "WAU WA1 TRU", "BMW": "WBA WBS WBY 5UX 5YM 4US WB1", "MERCEDES-BENZ": "WDB WDC WDD WDF 4JG 55S W1K W1N", "TESLA": "5YJ 7SA LRW", "VOLVO": "YV1 YV4 7JR", "INFINITI": "JNK JNR 5N3", "JAGUAR": "SAJ", "LAND ROVER": "SAL", "PORSCHE": "WP0 WP1", "MINI": "WMW", "FIAT": "ZFA", "KAWASAKI": "JKA", "YAMAHA": "JYA", "SUZUKI": "JS1 JS2 JS3 JS4", "HARLEY-DAVIDSON": "1HD", "DUCATI": "ZDM", "KTM": "VBK", "TRIUMPH": "SMT"};
+const MAKE_EXTRA = ["CHRYSLER", "DODGE", "JEEP", "RAM", "LINCOLN", "MERCURY", "PONTIAC", "SATURN", "SCION", "GENESIS", "POLESTAR", "RIVIAN", "LUCID"];
 /* ---------------- Validation ---------------- */
 function evaluate(S) {
   const stops = [], miss = [], warns = [];
@@ -757,6 +759,15 @@ function init() {
   { const sel = $('btmSel'); document.querySelectorAll('#btmList option').forEach((o) => { const e = document.createElement('option'); e.value = o.value; e.textContent = o.value + ' – ' + o.textContent; sel.appendChild(e); });
     sel.addEventListener('change', () => { if (sel.value) { $('btm').value = sel.value; $('btm').dispatchEvent(new Event('input', { bubbles: true })); } });
     $('btm').addEventListener('input', () => { const v = $('btm').value.toUpperCase(); sel.value = Array.from(sel.options).some((o) => o.value === v) ? v : ''; }); sel.value = Array.from(sel.options).some((o) => o.value === $('btm').value.toUpperCase()) ? $('btm').value.toUpperCase() : ''; }
+  { const sel = $('makeSel'), mk = $('make'); const wmap = {};
+    Object.keys(MAKE_WMI).forEach((n) => MAKE_WMI[n].split(' ').forEach((w) => { wmap[w] = n; }));
+    Object.keys(MAKE_WMI).concat(MAKE_EXTRA).sort().forEach((n) => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+    const sync = () => { const v = mk.value.toUpperCase(); sel.value = Array.from(sel.options).some((o) => o.value === v) ? v : ''; };
+    sel.addEventListener('change', () => { if (sel.value) { mk.value = sel.value; delete mk.dataset.user; mk.dispatchEvent(new Event('input', { bubbles: true })); } });
+    mk.addEventListener('input', (e) => { if (e.isTrusted) mk.dataset.user = '1'; sync(); });
+    $('vin').addEventListener('input', () => { const w = $('vin').value.toUpperCase().slice(0, 3); const n = wmap[w];
+      if (n && (!mk.value || mk.dataset.auto === mk.value) ) { mk.value = n; mk.dataset.auto = n; sync(); mk.dispatchEvent(new Event('input', { bubbles: true })); } });
+    sync(); }
   $('s8_cond').addEventListener('change', () => { $('s8_cond').dataset.touched = '1'; });
   $('vin').addEventListener('input', () => { $('vinChips').innerHTML = ''; });
   document.querySelectorAll('.photoRow').forEach((row) => {
