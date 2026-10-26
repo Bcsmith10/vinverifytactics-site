@@ -25,7 +25,8 @@
 <!-- Settings -->
 <section id="settingsCard" class="card hidden">
   <h2>Your verifier info <span class="tag">saved on this phone only</span></h2>
-  <p class="note">This prints in the verifier block on every form. Address is the one to confirm with the DMV before you rely on it.</p>
+  <p class="note">Name, license, phone and email print in the verifier block on every form.</p>
+  <label class="chk"><input type="checkbox" id="st_useloc" checked> Address in the verifier block = where the vehicle is being verified (confirmed with the DMV). Uses the job's "Physically verified at" address; the fields below are then ignored.</label>
   <div class="grid">
     <label>Verifier name (print)<input id="st_name" autocomplete="off"></label>
     <label>VV license number<input id="st_lic" autocomplete="off" placeholder="V00332"></label>

@@ -49,9 +49,13 @@ function collect() {
   S.docvin = S.docvin.toUpperCase().replace(/[^A-Z0-9]/g, '');
   S.gate = Array.from(document.querySelectorAll('.gate')).map((c) => c.checked);
   S.st = settings();
+  if (S.st.useloc) { // DMV: the address block is where the vehicle is being verified
+    S.loc_mode = 'other';
+    S.st = Object.assign({}, S.st, { addr: S.loc_street, city: S.loc_city, state: S.loc_state, _loc: true });
+  }
   return S;
 }
-function settings() { return Object.assign({ name:'', lic:'', addr:'', city:'', state:'CA', phone:'', email:'' }, LS.get('vvt_reg31_settings', {})); }
+function settings() { return Object.assign({ name:'', lic:'', addr:'', city:'', state:'CA', phone:'', email:'', useloc:true }, LS.get('vvt_reg31_settings', {})); }
 
 /* ---------------- Validation ---------------- */
 function evaluate(S) {
@@ -117,8 +121,8 @@ function evaluate(S) {
   if (!S.exec_date) miss.push('Date signed');
   const st = S.st;
   const stMiss = [];
-  if (!st.name) stMiss.push('name'); if (!st.lic) stMiss.push('license #'); if (!st.addr) stMiss.push('address');
-  if (!st.city) stMiss.push('city'); if (!st.state) stMiss.push('state'); if (!/\d{10}/.test((st.phone || '').replace(/\D/g, ''))) stMiss.push('10-digit phone'); if (!st.email) stMiss.push('email');
+  if (!st.name) stMiss.push('name'); if (!st.lic) stMiss.push('license #'); if (!st.addr && !st._loc) stMiss.push('address');
+  if (!st.city && !st._loc) stMiss.push('city'); if (!st.state && !st._loc) stMiss.push('state'); if (!/\d{10}/.test((st.phone || '').replace(/\D/g, ''))) stMiss.push('10-digit phone'); if (!st.email) stMiss.push('email');
   if (stMiss.length) miss.push('Your verifier info (Settings): ' + stMiss.join(', '));
 
   return { stops, miss, warns };
@@ -138,7 +142,7 @@ function refresh() {
   $('btmvaWrap').classList.toggle('hidden', S.btm.toUpperCase() !== 'VA');
   const plateOn = S.plate_type === 'plate';
   ['plate_no', 'plate_state', 'plate_exp'].forEach((id) => { $(id).disabled = !plateOn && S.plate_type !== 'dealer' && S.plate_type !== 'temp'; });
-  $('loc_street').disabled = S.loc_mode === 'above'; $('loc_city').disabled = S.loc_mode === 'above'; $('loc_state').disabled = S.loc_mode === 'above';
+  const lockLoc = S.loc_mode === 'above' && !S.st._loc; $('loc_street').disabled = lockLoc; $('loc_city').disabled = lockLoc; $('loc_state').disabled = lockLoc; $('loc_mode').disabled = !!S.st._loc;
 
   // VIN status + year choices
   const vs = $('vinStatus');
@@ -223,12 +227,12 @@ function today() { const d = new Date(); return String(d.getMonth() + 1).padStar
 function loadSettingsUI() {
   const s = settings();
   $('st_name').value = s.name; $('st_lic').value = s.lic; $('st_addr').value = s.addr; $('st_city').value = s.city;
-  $('st_state').value = s.state; $('st_phone').value = s.phone; $('st_email').value = s.email;
+  $('st_useloc').checked = !!s.useloc; $('st_state').value = s.state; $('st_phone').value = s.phone; $('st_email').value = s.email;
 }
 function saveSettingsUI() {
   LS.set('vvt_reg31_settings', {
     name: $('st_name').value.trim(), lic: $('st_lic').value.trim(), addr: $('st_addr').value.trim(), city: $('st_city').value.trim(),
-    state: $('st_state').value.trim().toUpperCase(), phone: $('st_phone').value.trim(), email: $('st_email').value.trim()
+    useloc: $('st_useloc').checked, state: $('st_state').value.trim().toUpperCase(), phone: $('st_phone').value.trim(), email: $('st_email').value.trim()
   });
   $('settingsCard').classList.add('hidden');
   refresh();
@@ -419,7 +423,7 @@ function drawEntries(ctx, S, opts) {
   text(st.state, 392, 604, 11, 52);
   const ph = (st.phone || '').replace(/\D/g, '');
   if (ph.length >= 10) { text(ph.slice(0, 3), 456.2, 604, 10.5); text(ph.slice(3, 6) + '-' + ph.slice(6, 10), 485, 604, 11); }
-  if (S.loc_mode === 'above') { check(BOX.at.above); text('N/A', 366, 628, 10); text('N/A', 509, 628, 10); }
+  if (S.loc_mode === 'above' || S.st._loc) { check(BOX.at.above); text('N/A', 366, 628, 10); text('N/A', 509, 628, 10); }
   else {
     check(BOX.at.other);
     text(S.loc_street, 77, 629.2, 9.5, 280);
