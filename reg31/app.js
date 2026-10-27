@@ -566,8 +566,9 @@ async function readVinFromLines(img, extraLines) {
   const res = { good: [], repaired: [], odd: [], raw: [] };
   const norm = (s) => s.toUpperCase().replace(/[^A-Z0-9 \n]/g, ' ').split(/\s+/).filter(Boolean).map((t) => t.replace(/O/g, '0').replace(/I/g, '1').replace(/Q/g, '0'));
   for (const L of lines.slice(0, 6)) {
-    for (const [trim, oh] of (L.n > 17 ? [[true, 64], [true, 32], [false, 64]] : [[false, 64], [false, 32]])) {
-    const cv = Reader.cleanCrop(img, L, L.sign, L.mh, trim, oh); if (!cv) continue;
+    for (const [trim, oh, fx] of (L.n > 17 ? [[true, 64, 1], [true, 32, 1], [false, 64, 1], [true, 64, 1.5], [false, 64, 1.5]] : [[false, 64, 1], [false, 32, 1], [false, 64, 1.5], [false, 64, 1.25]])) {
+    let cv = Reader.cleanCrop(img, L, L.sign, L.mh, trim, oh); if (!cv) continue;
+    if (fx !== 1) { const s = document.createElement('canvas'); s.width = Math.round(cv.width * fx); s.height = cv.height; const g = s.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, s.width, s.height); g.drawImage(cv, 0, 0, s.width, s.height); cv = s; }
     for (const psm of ['8', '7']) {
       const t = await ocrCanvas(cv, { tessedit_char_whitelist: VIN_WL, tessedit_pageseg_mode: psm });
       const r = vinCandidates(t); res.raw.push(...norm(t));
@@ -663,8 +664,19 @@ async function readLabelPhoto(img, stat) {
   let read = vinRes.good[0];
   const subseq = (a, b) => { let i = 0; for (const ch of b) if (ch === a[i]) i++; return i === a.length; };
   if (!read && typed.length === 17 && vinRes.raw.some((t) => t.length >= 17 && t.length <= 20 && subseq(typed, t))) read = typed;
+  // Narrow label fonts make OCR swap look-alike characters (G/6, A/4, S/5, B/8 ...). If the vehicle VIN passes its check digit and a 17-character reading differs from it only in such pairs, treat it as the same VIN and say so.
+  let ambiguous = '';
+  if (!read && typed.length === 17 && vinValid(typed)) {
+    const PAIRS = ['G6', 'A4', 'S5', 'B8', 'Z2', 'T7', 'D0', 'U0', 'C0', 'E3', 'H4', 'Y4', 'R8', 'P9', 'Q9', 'N1', 'F7', 'V7', 'L1', 'J1', 'K4', 'M4', 'W4'];
+    const like = (x, y) => PAIRS.some((p) => (p[0] === x && p[1] === y) || (p[0] === y && p[1] === x));
+    for (const t of vinRes.raw) {
+      if (t.length !== 17) continue;
+      const diffs = []; for (let i = 0; i < 17; i++) if (t[i] !== typed[i]) diffs.push(i);
+      if (diffs.length && diffs.length <= 3 && diffs.every((i) => like(t[i], typed[i]))) { read = typed; ambiguous = diffs.map((i) => (i + 1) + ': ' + t[i] + '→' + typed[i]).join(', '); break; }
+    }
+  }
   if (read && typed) {
-    if (read === typed) { $('s6_status').value = 'agrees'; notes.push('VIN on the label matches the vehicle'); }
+    if (read === typed) { $('s6_status').value = 'agrees'; notes.push(ambiguous ? 'VIN on the label matches the vehicle (the photo read some characters as look-alikes, positions ' + ambiguous + ' — compare by eye)' : 'VIN on the label matches the vehicle'); }
     else { $('s6_status').value = 'disagrees'; notes.push('VIN on the label (' + read + ') does NOT match the vehicle VIN'); }
   } else if (read) notes.push('label VIN read as ' + read + ' — enter the vehicle VIN to compare');
   else {
