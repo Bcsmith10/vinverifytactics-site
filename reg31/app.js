@@ -478,7 +478,7 @@ function drawEntries(ctx, S, opts) {
   text(S.exec_date, 511, 731, 11, 76);
 }
 
-window.__ocr = (f,p)=>ocr(f,p); window.__vinCand = vinCandidates; window.__buildPdf = buildPdf; window.__collect = collect; window.__evaluate = evaluate;
+window.__fullText = fullText; window.__ocrCanvas = ocrCanvas; window.__fileToCanvas = fileToCanvas; window.__ocr = (f,p)=>ocr(f,p); window.__vinCand = vinCandidates; window.__buildPdf = buildPdf; window.__collect = collect; window.__evaluate = evaluate;
 
 /* ---------------- OCR (optional suggestions; you confirm everything) ---------------- */
 let workerPromise = null;
@@ -626,6 +626,35 @@ async function fullText(img, psm) {
   const fc = Reader.flatCanvas(img);
   return (await ocrCanvas(fc, { tessedit_char_whitelist: '', tessedit_pageseg_mode: psm || '12' })).toUpperCase();
 }
+
+/* ---- orientation / skew helpers for label photos ---- */
+function rotCanvas(c, deg, fill) {
+  const sw = Math.abs(deg) % 180 === 90; const r = document.createElement('canvas');
+  r.width = sw ? c.height : c.width; r.height = sw ? c.width : c.height;
+  const g = r.getContext('2d'); if (fill) { g.fillStyle = fill; g.fillRect(0, 0, r.width, r.height); }
+  g.translate(r.width / 2, r.height / 2); g.rotate(deg * Math.PI / 180); g.drawImage(c, -c.width / 2, -c.height / 2); return r;
+}
+function invCanvas(c) {
+  const r = document.createElement('canvas'); r.width = c.width; r.height = c.height;
+  const g = r.getContext('2d', { willReadFrequently: true }); g.drawImage(c, 0, 0);
+  const id = g.getImageData(0, 0, r.width, r.height), d = id.data;
+  for (let i = 0; i < d.length; i += 4) { d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2]; }
+  g.putImageData(id, 0, 0); return r;
+}
+const LABEL_KW = /FEDERAL|SAFETY|STANDARDS|MANUFACTURE|PASSENGER|MULTIPURPOSE|TRUCK|GVWR|GAWR|CONFORMS|APPLICABLE|BUMPER|THEFT|PREVENTION|VEHICLE|MODEL|COLOR|DATE|MFD|MOTOR|EMISSION|CONTROL|INFORMATION|REGULATIONS|CALIFORNIA|ENGINE|FAMILY|GROUP|FUEL|GASOLINE|OBD|EPA/g;
+async function orientCanvas(cv) {
+  // Phones often save label photos sideways. Read at a small size in each orientation and keep the one with the most label words.
+  const small = (c) => Reader.toGray(c, 1100);
+  let best = { deg: 0, score: -1 };
+  for (const deg of [0, 90, 270, 180]) {
+    const c = deg ? rotCanvas(cv, deg) : cv;
+    const t = (await fullText(small(c))) + ' ' + (await fullText(small(invCanvas(c)), '6'));
+    const score = (t.match(LABEL_KW) || []).length;
+    if (score > best.score) best = { deg, score };
+    if (score >= 8) break;
+  }
+  return best.deg ? rotCanvas(cv, best.deg) : cv;
+}
 const PICKUP_BTM = ['PK', 'PC', '3C', '4C', 'SP'];
 async function readLabelPhoto(img, stat) {
   const [vinRes, text] = [await readVinFromLines(img), await fullText(img)];
@@ -638,15 +667,21 @@ async function readLabelPhoto(img, stat) {
     if (read === typed) { $('s6_status').value = 'agrees'; notes.push('VIN on the label matches the vehicle'); }
     else { $('s6_status').value = 'disagrees'; notes.push('VIN on the label (' + read + ') does NOT match the vehicle VIN'); }
   } else if (read) notes.push('label VIN read as ' + read + ' — enter the vehicle VIN to compare');
-  else notes.push('could not read the VIN on the label — set the status yourself');
+  else {
+    const lcs = (x, y) => { let best = ''; const dp = Array(y.length + 1).fill(0); for (let i = 1; i <= x.length; i++) { let prev = 0; for (let j = 1; j <= y.length; j++) { const tmp = dp[j]; dp[j] = x[i - 1] === y[j - 1] ? prev + 1 : 0; if (dp[j] > best.length) best = x.slice(i - dp[j], i); prev = tmp; } } return best; };
+    const part = typed.length === 17 ? vinRes.raw.map((t) => lcs(typed, t)).sort((p, q) => q.length - p.length)[0] || '' : '';
+    notes.push(part.length >= 8 ? 'could only partly read the label VIN (it matches the vehicle VIN in “' + part + '”). Compare the whole VIN by eye and set the status yourself' : 'could not read the VIN on the label — compare it by eye and set the status yourself');
+  }
   if (/FEDERAL|FMVSS|MOTOR VEHICLE SAFETY/.test(text)) { $('s6_ind').value = 'fmvss'; notes.push('says it meets US FMVSS'); }
   else if (/CMVSS|CANADA|CANADIAN/.test(text)) { $('s6_ind').value = 'other'; notes.push('shows another country\'s standards'); }
   const g = text.match(/GVWR[^0-9]{0,14}(\d[\d,.]{2,6})\s*(KG|LBS?)?[^0-9]{0,8}\(?(\d[\d,.]{2,6})?\s*(KG|LBS?)?/);
   if (g) {
     const nums = [[g[1], g[2]], [g[3], g[4]]].filter((x) => x[0]).map((x) => ({ n: Number(x[0].replace(/[,.]/g, '')), u: x[1] || '' }));
-    let lbs = (nums.find((x) => /LB/.test(x.u)) || {}).n;
-    if (!lbs && nums[0] && /KG/.test(nums[0].u)) lbs = Math.round(nums[0].n * 2.2046);
-    if (lbs) { notes.push('GVWR ' + lbs + ' lb'); if (PICKUP_BTM.includes(($('btm').value || '').toUpperCase())) $('gvwr').value = String(lbs); }
+    let lbs = (nums.find((x) => /LB/.test(x.u)) || {}).n; const kg = (nums.find((x) => /KG/.test(x.u)) || {}).n;
+    let check = '';
+    if (kg && lbs && Math.abs(kg * 2.2046 - lbs) > 6) { lbs = Math.round(kg * 2.2046); check = ' (kg and lb disagreed, so worked out from kg; check it)'; }
+    else if (!lbs && kg) lbs = Math.round(kg * 2.2046);
+    if (lbs && PICKUP_BTM.includes(($('btm').value || '').toUpperCase())) { $('gvwr').value = String(lbs); notes.push('GVWR ' + lbs + ' lb' + check); }
   }
   const d = text.match(/DATE[:\s]*([01]?\d\s*[\/-]\s*\d{2,4})/);
   if (d) notes.push('built ' + d[1].replace(/\s/g, ''));
@@ -680,23 +715,33 @@ async function handlePhoto(kind, file, row) {
       else if (ocrKind === 'docvin') await readDocPhoto(img, ocrKind, stat);
       else applyVin(ocrKind, await readVinFromLines(img), stat);
     } else if (ocrKind === 'label') {
-      const cv = await fileToCanvas(file); const img = Reader.toGray(cv, Reader.MAXW);
+      const cv = await orientCanvas(await fileToCanvas(file)); const img = Reader.toGray(cv, Reader.MAXW);
       await readLabelPhoto(img, stat);
     } else if (ocrKind === 'emis') {
-      const cv = await fileToCanvas(file); const img = Reader.toGray(cv, Reader.MAXW);
-      const up = await fullText(img);
-      const ca = /CALIFORNIA/.test(up), epa = /EPA|ENVIRONMENTAL PROTECTION|FEDERAL/.test(up);
+      const cv = await orientCanvas(await fileToCanvas(file));
+      // Emission labels are often white-on-black, glossy and slightly slanted: read a few straightened/inverted passes and vote.
+      const passes = [[true, 3], [true, 6], [false, 0], [true, 0], [true, -3]];
+      let all = ''; const votes = {};
+      for (const [inv, deg] of passes) {
+        let c = deg ? rotCanvas(cv, deg, '#777') : cv; if (inv) c = invCanvas(c);
+        const t = await fullText(Reader.toGray(c, Reader.MAXW), '6'); all += '\n' + t;
+        const m = t.match(/GROUP\s*[:;]?\s*([A-Z0-9][A-Z0-9.]{8,14}[A-Z0-9])/) || t.match(/(?:ENGINE\s*FAMILY|TEST\s*GROUP|FAMILY)\s*(?:NO\.?|NUMBER|#)?\s*[:#]?\s*([A-Z0-9][A-Z0-9.\-]{7,15}[A-Z0-9])/);
+        if (m) votes[m[1]] = (votes[m[1]] || 0) + 1;
+        if (Object.values(votes).some((n) => n >= 2)) break;
+      }
+      const up = all;
+      const ca = /CALI\w{0,5}NIA|CALITORNIA|LEV\s?\d|ULEV/.test(up), epa = /\bEPA\b|U\.?\s?S\.?\s?EP|ENVIRONMENTAL PROTECTION|\bT\d[A-Z]\d\b/.test(up);
       let hint = '';
       if (ca && epa) { hint = 'Label text mentions both California and EPA/federal.'; $('s9').value = 'both'; }
       else if (ca) { hint = 'Label text mentions California.'; $('s9').value = 'ca'; }
       else if (epa) { hint = 'Label text mentions EPA/federal.'; $('s9').value = 'epa'; }
       else hint = 'Could not tell from the photo.';
       setStatus($('emisHint'), 'warnx', hint + ' Confirm by reading the label.');
-      const toks = (up.match(/\b[A-Z0-9][A-Z0-9.\-]{8,15}[A-Z0-9]\b/g) || []).filter((t) => /\d/.test(t) && /[A-Z]/.test(t)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 6);
+      const ranked = Object.keys(votes).sort((x, y) => votes[y] - votes[x]);
+      const toks = ranked.concat((up.match(/\b[A-Z0-9][A-Z0-9.\-]{8,15}[A-Z0-9]\b/g) || []).filter((t) => /\d/.test(t) && /[A-Z]/.test(t) && /\./.test(t))).filter((x, i, a2) => a2.indexOf(x) === i).slice(0, 6);
       chips('emisChips', toks, (v) => { $('s9_family').value = v; refresh(); });
-      const anch = up.match(/(?:ENGINE\s*FAMILY|TEST\s*GROUP|FAMILY)\s*(?:NO\.?|NUMBER|#)?\s*[:#]?\s*([A-Z0-9][A-Z0-9.\-]{7,15}[A-Z0-9])/);
-      if (anch) { $('s9_family').value = anch[1]; stat.textContent = 'Read from label: ' + anch[1] + ' — confirm it against the label.'; }
-      else stat.textContent = toks.length ? 'Tap the engine family / test group number if you see it.' : 'Type the engine family / test group number.';
+      if (ranked.length && votes[ranked[0]] >= 2) { $('s9_family').value = ranked[0]; stat.textContent = 'Read from label: ' + ranked[0] + ' — confirm it against the label.'; }
+      else stat.textContent = toks.length ? 'Not sure of the engine family / test group. Tap the closest one below, or type it.' : 'Type the engine family / test group number.';
     }
   } catch (e) {
     stat.textContent = 'Photo reading is not available right now. Type the value instead.';
