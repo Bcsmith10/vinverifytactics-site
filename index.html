@@ -143,6 +143,21 @@
         <label for="vehicle">Year / Make / Model</label>
         <input type="text" id="vehicle" name="vehicle" placeholder="2014 Honda Civic" required>
       </div>
+      <div class="full">
+        <label for="vtype">Vehicle type</label>
+        <select id="vtype" name="vehicle_type" required>
+          <option value="">Select one</option>
+          <option>Car / SUV / minivan</option>
+          <option>Pickup truck</option>
+          <option>Commercial truck / van / bus</option>
+          <option>Trailer (utility, cargo, flatbed, etc.)</option>
+          <option>Travel trailer / fifth wheel / camp trailer</option>
+          <option>Motorhome / RV</option>
+          <option>Motorcycle (we'll confirm eligibility)</option>
+          <option>Off-highway vehicle / ATV (please call first)</option>
+          <option>Other / not sure</option>
+        </select>
+      </div>
       <div>
         <label for="date">Preferred day</label>
         <input type="date" id="date" name="preferred_date" required>
@@ -165,9 +180,12 @@
         <label for="reason">Reason for verification</label>
         <select id="reason" name="reason" required>
           <option value="">Select one</option>
+          <option>Out-of-state vehicle / moving to California</option>
           <option>Out-of-state title transfer</option>
           <option>No California registration record</option>
           <option>Commercial fleet / trailer addition</option>
+          <option>Dealer inventory</option>
+          <option>Can't make it to the DMV</option>
           <option>Other</option>
         </select>
       </div>
