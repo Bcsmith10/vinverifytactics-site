@@ -60,3 +60,5 @@ a.primary.linkbtn{color:#fff}
 .vinbig span i{display:block;font:500 9px sans-serif;color:#6B7A99}
 .odobig{font:700 22px ui-monospace,Menlo,monospace;margin:8px 0 2px}
 .finalRow{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+
+.docCompare{margin:8px 0;font-size:13px}.docCompare.dim{color:var(--steel,#667)}.docCompare .dc{margin:3px 0}.docCompare .dc.ok{color:var(--green)}.docCompare .dc.bad{color:var(--red);font-weight:600}.docCompare .dc.unsure{color:var(--amber)}

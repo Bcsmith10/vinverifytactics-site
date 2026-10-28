@@ -166,6 +166,7 @@ function refresh() {
     else { setStatus(ds, 'bad', '✗ Document VIN differs from the vehicle VIN.'); if (!$('s8_cond').dataset.touched) $('s8_cond').value = 'disagrees'; }
   } else setStatus(ds, '', '');
 
+  renderDocCompare();
   renderFinal(collect());
   const E = evaluate(collect());
   showList($('stopBox'), 'Do not sign this as a private verifier:', E.stops, true);
@@ -478,7 +479,7 @@ function drawEntries(ctx, S, opts) {
   text(S.exec_date, 511, 731, 11, 76);
 }
 
-window.__fullText = fullText; window.__ocrCanvas = ocrCanvas; window.__fileToCanvas = fileToCanvas; window.__ocr = (f,p)=>ocr(f,p); window.__vinCand = vinCandidates; window.__buildPdf = buildPdf; window.__collect = collect; window.__evaluate = evaluate;
+window.__fullText = fullText; window.__ocrCanvas = ocrCanvas; window.__fileToCanvas = fileToCanvas; window.__ocr = (f,p)=>ocr(f,p); window.__vinCand = vinCandidates; window.__buildPdf = buildPdf; window.__parseDoc = parseDocText; window.__compareDoc = compareDoc; window.__collect = collect; window.__evaluate = evaluate;
 
 /* ---------------- OCR (optional suggestions; you confirm everything) ---------------- */
 let workerPromise = null;
@@ -699,10 +700,80 @@ async function readLabelPhoto(img, stat) {
   if (d) notes.push('built ' + d[1].replace(/\s/g, ''));
   stat.textContent = 'From the label: ' + notes.join(' · ') + '. Confirm against the car.';
 }
+
+// ---- Ownership document vs vehicle comparison (extra cross-check; only the VIN is asked for on the form) ----
+const MAKE_ABBR = {NISS:'NISSAN',TOYT:'TOYOTA',HOND:'HONDA',CHEV:'CHEVROLET',CHEVY:'CHEVROLET',MERZ:'MERCEDES-BENZ',MBNZ:'MERCEDES-BENZ',VOLK:'VOLKSWAGEN',VW:'VOLKSWAGEN',HYUN:'HYUNDAI',MAZD:'MAZDA',SUBA:'SUBARU',MITS:'MITSUBISHI',LEXS:'LEXUS',ACUR:'ACURA',INFI:'INFINITI',CADI:'CADILLAC',LNDR:'LAND ROVER',JAGU:'JAGUAR',HARL:'HARLEY-DAVIDSON',KAWK:'KAWASAKI',YAMA:'YAMAHA',SUZI:'SUZUKI',TESL:'TESLA',PORS:'PORSCHE',DODG:'DODGE',CHRY:'CHRYSLER',LINC:'LINCOLN',MERC:'MERCURY',PONT:'PONTIAC',SATN:'SATURN',SCIO:'SCION',BUIC:'BUICK',VOLV:'VOLVO'};
+function canonMake(m) {
+  m = (m || '').toUpperCase().replace(/[^A-Z\- ]/g, '').trim();
+  if (!m) return '';
+  if (MAKE_ABBR[m]) return MAKE_ABBR[m];
+  const all = Object.keys(MAKE_WMI).concat(MAKE_EXTRA);
+  if (all.includes(m)) return m;
+  const hit = all.find((n) => m.length >= 4 && n.startsWith(m));
+  return hit || m;
+}
+function parseDocText(text) {
+  const t = (text || '').toUpperCase();
+  const years = Array.from(new Set((t.match(/\b(19[5-9]\d|20[0-3]\d)\b/g) || []).map(Number)));
+  const names = Object.keys(MAKE_WMI).concat(MAKE_EXTRA);
+  const makes = new Set();
+  names.forEach((n) => { const re = new RegExp('(^|[^A-Z])' + n.replace(/[-\s]/g, '[-\\s]?') + '([^A-Z]|$)'); if (re.test(t)) makes.add(n); });
+  Object.keys(MAKE_ABBR).forEach((a) => { if (new RegExp('(^|[^A-Z0-9])' + a + '([^A-Z0-9]|$)').test(t)) makes.add(MAKE_ABBR[a]); });
+  return { text: t, squashed: t.replace(/[^A-Z0-9]/g, ''), years, makes: Array.from(makes) };
+}
+function compareDoc(D, v) {
+  // returns [{k:'ok'|'bad'|'unsure', label, msg}] — never blocks the form; a mismatch is for you to look at
+  const rows = [];
+  if (!D) return rows;
+  if (v.year) {
+    if (D.years.includes(Number(v.year))) rows.push({ k: 'ok', label: 'Year', msg: v.year + ' appears on the document.' });
+    else rows.push({ k: 'unsure', label: 'Year', msg: v.year + ' not found in the text' + (D.years.length ? ' (document shows ' + D.years.slice(0, 5).join(', ') + ')' : '') + ' — check by eye.' });
+  }
+  const vm = canonMake(v.make);
+  if (vm) {
+    if (D.makes.includes(vm)) rows.push({ k: 'ok', label: 'Make', msg: vm + ' appears on the document.' });
+    else if (D.makes.length) rows.push({ k: 'bad', label: 'Make', msg: 'Vehicle is ' + vm + ' but the document shows ' + D.makes.join(' / ') + '.' });
+    else rows.push({ k: 'unsure', label: 'Make', msg: 'Could not find a make on the document — check by eye.' });
+  }
+  const mt = (v.model || '').toUpperCase().split(/[^A-Z0-9]+/).filter((x) => x.length >= 3)[0];
+  if (mt) {
+    if (D.text.includes(mt)) rows.push({ k: 'ok', label: 'Model', msg: mt + ' appears on the document.' });
+    else rows.push({ k: 'unsure', label: 'Model', msg: mt + ' not found in the text — check by eye.' });
+  }
+  const pl = (v.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (pl.length >= 5) {
+    if (D.squashed.includes(pl)) rows.push({ k: 'ok', label: 'Plate', msg: pl + ' appears on the document.' });
+    else rows.push({ k: 'unsure', label: 'Plate', msg: pl + ' not found in the text — check by eye (titles may not show the plate).' });
+  }
+  return rows;
+}
+let docRead = null;
+function renderDocCompare() {
+  const box = $('docCompare'); if (!box) return;
+  box.innerHTML = '';
+  if (!docRead) return;
+  const rows = compareDoc(docRead, { year: $('year').value, make: $('make').value, model: $('model').value, plate: $('plate_no').value });
+  if (!rows.length) { box.textContent = 'Fill in the vehicle year, make and model above to compare them with this document.'; box.className = 'docCompare dim'; return; }
+  box.className = 'docCompare';
+  const h = document.createElement('b'); h.textContent = 'Document vs. vehicle (extra check — only the VIN is asked for on the form)'; box.appendChild(h);
+  rows.forEach((r) => {
+    const d = document.createElement('div'); d.className = 'dc ' + r.k;
+    d.textContent = (r.k === 'ok' ? '✓ ' : r.k === 'bad' ? '✗ ' : '? ') + r.label + ': ' + r.msg;
+    box.appendChild(d);
+  });
+}
 async function readDocPhoto(img, kind, stat) {
   const vinRes = await readVinFromLines(img);
   applyVin(kind, vinRes, stat);
   const text = await fullText(img);
+  docRead = parseDocText(text);
+  if (!vinRes.good.length) {
+    // Page-style documents: the line finder is built for plates, so also look for a valid VIN in the page text.
+    const toks = (text.match(/[A-Z0-9]{17}/g) || []).concat((text.replace(/[ \t]+/g, '').match(/[A-Z0-9]{17}/g) || []));
+    const hit = toks.find(vinValid);
+    if (hit) { $('docvin').value = hit; stat.textContent = 'Read from the document — check it against the photo.'; refresh(); }
+  }
+  renderDocCompare();
   let t = '';
   if (/SALVAGE/.test(text)) t = 'salvage';
   else if (/MANUFACTURER.?S (CERTIFICATE|STATEMENT)|\bMSO\b|\bMCO\b/.test(text)) t = 'msomco';
