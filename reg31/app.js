@@ -1,3 +1,4 @@
+/* Copyright (c) 2026 VinVerifyTactics. All rights reserved. Proprietary; no copying or redistribution without written permission. */
 /* REG 31 Assistant — private tool. Everything runs in this browser; nothing is uploaded.
    Verifier info, job log and the unfinished draft live in this phone's localStorage. Photos are never saved. */
 (function () {

@@ -1,3 +1,4 @@
+/* Copyright (c) 2026 VinVerifyTactics. All rights reserved. Proprietary; no copying or redistribution without written permission. */
 /* Photo reader for the REG 31 Assistant.
    Finds lines of characters in a photo (ignoring dust, barcodes and glare), cleans each line up, and hands it to Tesseract.
    Everything runs in the browser. Results are suggestions: the form still needs your eyes on the vehicle. */
