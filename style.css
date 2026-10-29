@@ -342,3 +342,7 @@ footer a{color:var(--tag);text-decoration:none;}
 .hero .wrap{position:relative;}
 .hero-mark{position:absolute;right:24px;top:50%;transform:translateY(-50%);width:320px;height:auto;opacity:.95;}
 @media (max-width: 900px){.hero-mark{display:none;}}
+
+.hero-btns{display:flex;flex-wrap:wrap;gap:12px}
+@media (max-width:520px){.hero-btns .btn{flex:1 1 100%;justify-content:center}}
+.check-row{text-transform:none;letter-spacing:0;font-family:var(--font-body);font-size:15px;line-height:1.4}
