@@ -7,7 +7,7 @@
 // 3) Prevents choosing a past date.
 
 // Web app URL of the Google Apps Script (ends in /exec). Empty = Formspree only.
-var GOOGLE_ENDPOINT = '';
+var GOOGLE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyxNmEJ1W0MXICKyRXH7Bv6Y13oUIhuGWmc4XSgSFPGG-41zohf6oNIK35yRVyzWBAO/exec';
 
 document.addEventListener('DOMContentLoaded', function () {
   var form = document.getElementById('booking-form');
