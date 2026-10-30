@@ -27,18 +27,14 @@ That's your live site. Use that link on Google Business Profile, in emails, on f
 
 DNS changes can take up to 24 hours to fully propagate.
 
-## 3. Connect the booking form to your email (Formspree — free tier)
+## 3. Booking form (Google Apps Script)
 
-The form currently points to a placeholder (`YOUR_FORM_ID`) and won't actually send anywhere until you fix this:
+The booking form posts to a Google Apps Script web app. For every request it:
 
-1. Go to formspree.io and sign up for a free account (this is a form-delivery utility, not a booking platform — it just emails you what people submit).
-2. Create a new form, and copy the endpoint URL it gives you (looks like `https://formspree.io/f/abc123xy`).
-3. In `index.html`, find this line:
-   `<form id="booking-form" class="form-grid" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">`
-   and replace `YOUR_FORM_ID` with your actual endpoint.
-4. Commit/upload the updated file back to GitHub.
+- adds a row to the **Bookings** tab of a Google Sheet (the permanent record),
+- emails the owner the details (reply goes to the customer).
 
-Free tier covers 50 submissions/month, which is well above what you'll need starting out.
+The web app address is set as `GOOGLE_ENDPOINT` at the top of `app.js` and as the form's `action` in `index.html`. The script itself lives in the owner's Google account (Extensions → Apps Script in the sheet), not in this repository. After changing the script, redeploy it (Deploy → Manage deployments → edit → new version).
 
 ## 4. Using the dashboard
 
