@@ -66,6 +66,16 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(function (err) { if (timer) clearTimeout(timer); throw err; });
   }
 
+  function localISO(addDays) {
+    var d = new Date();
+    d.setDate(d.getDate() + addDays);
+    var m = String(d.getMonth() + 1); if (m.length < 2) m = '0' + m;
+    var day = String(d.getDate()); if (day.length < 2) day = '0' + day;
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+  var dateInput = document.getElementById('date');
+  if (dateInput) { dateInput.min = localISO(0); dateInput.max = localISO(366); }
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     errorMsg.style.display = 'none';
@@ -75,6 +85,23 @@ document.addEventListener('DOMContentLoaded', function () {
     if (anyFlagChecked()) {
       blockedMsg.style.display = 'block';
       blockedMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // Basic sanity checks: real phone number, date today or later.
+    var phoneEl = document.getElementById('phone');
+    var dateEl = document.getElementById('date');
+    var digits = (phoneEl.value || '').replace(/\D/g, '');
+    if (digits.length === 11 && digits.charAt(0) === '1') digits = digits.slice(1);
+    var badPhone = !(digits.length === 10 && /^[2-9]/.test(digits));
+    var badDate = !dateEl.value || dateEl.value < localISO(0) || dateEl.value > localISO(366);
+    if (badPhone || badDate) {
+      var which = badPhone ? phoneEl : dateEl;
+      which.setCustomValidity(badPhone
+        ? 'Please enter a 10-digit US phone number, like 510-555-1234.'
+        : 'Please choose a day from today forward.');
+      which.reportValidity();
+      which.addEventListener('input', function clr() { which.setCustomValidity(''); which.removeEventListener('input', clr); });
       return;
     }
 
